@@ -2,19 +2,27 @@ use crate::ConcurrentOption;
 use std::sync::atomic::Ordering;
 
 impl<T> ConcurrentOption<T> {
-    pub fn insert_if_none(&self, value: T) -> bool {
+    pub fn initiate_if_none(&self, value: T) -> bool {
         const ORDER_LOAD: Ordering = Ordering::SeqCst;
         const ORDER_STORE: Ordering = Ordering::SeqCst;
 
         match self.written.load(ORDER_LOAD) {
             true => false,
             false => {
-                let x = unsafe { self.maybe_uninit_mut() };
+                let x = unsafe { &mut *self.value.get() };
                 x.write(value);
                 self.written.store(true, ORDER_STORE);
                 true
             }
         }
+    }
+
+    pub unsafe fn initiate_unchecked(&self, value: T) {
+        const ORDER_STORE: Ordering = Ordering::SeqCst;
+
+        let x = unsafe { &mut *self.value.get() };
+        x.write(value);
+        self.written.store(true, ORDER_STORE);
     }
 
     #[cfg(feature = "experimental")]
@@ -27,7 +35,7 @@ impl<T> ConcurrentOption<T> {
 
         match x.is_ok() {
             true => {
-                let x = self.maybe_uninit();
+                let x = unsafe { &*self.value.get() };
                 Some(std::mem::MaybeUninit::assume_init_read(x))
             }
             false => None,

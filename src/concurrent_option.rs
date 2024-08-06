@@ -15,10 +15,6 @@ impl<T> ConcurrentOption<T> {
         let x = &mut *self.value.get();
         x.assume_init_mut()
     }
-
-    pub(crate) unsafe fn maybe_uninit_mut(&self) -> &mut MaybeUninit<T> {
-        &mut *self.value.get()
-    }
 }
 
 unsafe impl<T: Send> Send for ConcurrentOption<T> {}

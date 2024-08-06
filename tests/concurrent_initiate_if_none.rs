@@ -7,7 +7,7 @@ use test_case::test_matrix;
     [false, true],
     [Ordering::SeqCst, Ordering::Acquire]
 )]
-fn concurrent_insert_if_none_single_writer(
+fn concurrent_initiate_if_none_single_writer(
     num_readers: usize,
     do_sleep: bool,
     read_order: Ordering,
@@ -34,7 +34,7 @@ fn concurrent_insert_if_none_single_writer(
     [false, true],
     [Ordering::SeqCst, Ordering::Acquire]
 )]
-fn concurrent_insert_if_none_multiple_writer(
+fn concurrent_initiate_if_none_multiple_writer(
     num_writers: usize,
     num_readers: usize,
     do_sleep: bool,
@@ -74,11 +74,11 @@ fn write_single(do_sleep: bool, maybe_ref: &ConcurrentOption<String>) {
         sleep(do_sleep);
         match i {
             40 => {
-                let inserted = maybe_ref.insert_if_none(7.to_string());
+                let inserted = maybe_ref.initiate_if_none(7.to_string());
                 assert!(inserted);
             }
             70 => {
-                let inserted = maybe_ref.insert_if_none(111.to_string());
+                let inserted = maybe_ref.initiate_if_none(111.to_string());
                 assert!(!inserted);
             }
             _ => {}
@@ -91,7 +91,7 @@ fn write_multi(do_sleep: bool, maybe_ref: &ConcurrentOption<String>) {
         sleep(do_sleep);
         match i {
             40 | 70 => {
-                let _ = maybe_ref.insert_if_none(7.to_string());
+                let _ = maybe_ref.initiate_if_none(7.to_string());
             }
             _ => {}
         }

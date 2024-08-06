@@ -16,4 +16,21 @@ impl<T> ConcurrentOption<T> {
             }
         }
     }
+
+    #[cfg(feature = "experimental")]
+    pub unsafe fn take_x(&self) -> Option<T> {
+        const ORDER_LOAD: Ordering = Ordering::SeqCst;
+
+        let x = self
+            .written
+            .compare_exchange(true, false, ORDER_LOAD, ORDER_LOAD);
+
+        match x.is_ok() {
+            true => {
+                let x = self.maybe_uninit();
+                Some(std::mem::MaybeUninit::assume_init_read(x))
+            }
+            false => None,
+        }
+    }
 }

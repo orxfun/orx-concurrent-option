@@ -85,3 +85,26 @@ fn eq() {
     assert!(!z.eq(&y));
     assert!(z.eq(&z));
 }
+
+#[test]
+fn from() {
+    let x: ConcurrentOption<String> = 3.to_string().into();
+    assert_eq!(x.as_ref(Ordering::Relaxed), Some(&3.to_string()));
+
+    let x: ConcurrentOption<String> = Some(3.to_string()).into();
+    assert_eq!(x.as_ref(Ordering::Relaxed), Some(&3.to_string()));
+
+    let x: ConcurrentOption<String> = None.into();
+    assert_eq!(x.as_ref(Ordering::Relaxed), None);
+}
+
+#[test]
+fn into() {
+    let x = ConcurrentOption::some(3.to_string());
+    let y: Option<_> = x.into();
+    assert_eq!(y, Some(3.to_string()));
+
+    let x = ConcurrentOption::<String>::none();
+    let y: Option<String> = x.into();
+    assert_eq!(y, None);
+}

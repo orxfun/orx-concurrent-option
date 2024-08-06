@@ -5,3 +5,7 @@ edition = "2021"
 publish = ["artifactory"]
 
 [dependencies]
+
+
+[dev-dependencies]
+test-case = "3.3.1"

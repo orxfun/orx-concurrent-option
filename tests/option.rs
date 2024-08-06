@@ -166,17 +166,18 @@ fn unwrap_or_else() {
 
 #[test]
 fn unwrap_unchecked() {
-    let x = ConcurrentOption::some("air");
-    assert_eq!(unsafe { x.unwrap_unchecked() }, "air");
+    let x = ConcurrentOption::some("air".to_string());
+    assert_eq!(unsafe { x.unwrap_unchecked() }, "air".to_string());
 }
 
-#[test]
-#[should_panic]
-#[cfg(not(miri))]
-fn unwrap_unchecked_undefined_behavior() {
-    let x = ConcurrentOption::<&str>::none();
-    assert_eq!(unsafe { x.unwrap_unchecked() }, "air");
-}
+// UNDEFINED
+// #[test]
+// #[should_panic]
+// #[cfg(not(miri))]
+// fn unwrap_unchecked_undefined_behavior() {
+//     let x = ConcurrentOption::<String>::none();
+//     assert_eq!(unsafe { x.unwrap_unchecked() }, "air".to_string());
+// }
 
 #[test]
 #[should_panic]

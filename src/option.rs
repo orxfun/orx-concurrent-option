@@ -16,9 +16,28 @@ impl<T> ConcurrentOption<T> {
         !self.written.load(order)
     }
 
+    /// Converts from `&Option<T>` to `Option<&T>`.
+    ///
+    /// Recommended ordering to read:
+    /// * Use `Relaxed` if there is no thread that is concurrently writing via methods such as:
+    ///   * `insert_if_none`
+    /// * Use `Acquire` or `SeqCst` otherwise.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use orx_concurrent_option::*;
+    /// use std::sync::atomic::Ordering;
+    ///
+    /// let mut x = ConcurrentOption::some(3.to_string());
+    /// assert_eq!(x.as_ref(Ordering::Relaxed), Some(&3.to_string()));
+    ///
+    /// _ = x.take();
+    /// assert_eq!(x.as_ref(Ordering::Relaxed), None);
+    /// ```
     pub fn as_ref(&self, order: Ordering) -> Option<&T> {
         match self.written.load(order) {
-            true => Some(unsafe { self.value.assume_init_ref() }),
+            true => Some(unsafe { self.value_ref() }),
             false => None,
         }
     }
@@ -28,7 +47,7 @@ impl<T> ConcurrentOption<T> {
         T: Deref,
     {
         match self.written.load(order) {
-            true => Some(unsafe { self.value.assume_init_ref() }),
+            true => Some(unsafe { self.value_ref() }),
             false => None,
         }
     }
@@ -49,7 +68,7 @@ impl<T> ConcurrentOption<T> {
 
     pub fn as_mut(&mut self) -> Option<&mut T> {
         match self.written.load(Ordering::Relaxed) {
-            true => Some(unsafe { self.value.assume_init_mut() }),
+            true => Some(unsafe { self.value_mut() }),
             false => None,
         }
     }
@@ -59,7 +78,8 @@ impl<T> ConcurrentOption<T> {
             false => None,
             true => {
                 self.written.store(false, Ordering::Relaxed);
-                Some(unsafe { self.value.assume_init_read() })
+                let x = unsafe { &mut *self.value.get() };
+                Some(unsafe { x.assume_init_read() })
             }
         }
     }
@@ -82,12 +102,12 @@ impl<T> ConcurrentOption<T> {
     pub fn replace(&mut self, value: T) -> Option<T> {
         match self.written.load(Ordering::Relaxed) {
             true => {
-                let x = unsafe { self.value.assume_init_mut() };
+                let x = unsafe { self.value_mut() };
                 let old = std::mem::replace(x, value);
                 Some(old)
             }
             false => {
-                self.value = MaybeUninit::new(value);
+                self.value = MaybeUninit::new(value).into();
                 self.written.store(true, Ordering::Relaxed);
                 None
             }
@@ -97,11 +117,11 @@ impl<T> ConcurrentOption<T> {
     pub fn insert(&mut self, value: T) -> &mut T {
         match self.written.load(Ordering::Relaxed) {
             true => {
-                let x = unsafe { self.value.assume_init_mut() };
+                let x = unsafe { self.value_mut() };
                 let _ = std::mem::replace(x, value);
             }
             false => {
-                self.value = MaybeUninit::new(value);
+                self.value = MaybeUninit::new(value).into();
                 self.written.store(true, Ordering::Relaxed);
             }
         }
@@ -118,7 +138,7 @@ impl<T> ConcurrentOption<T> {
         F: FnOnce() -> T,
     {
         if !self.written.load(Ordering::Relaxed) {
-            self.value = MaybeUninit::new(f());
+            self.value = MaybeUninit::new(f()).into();
             self.written.store(true, Ordering::Relaxed);
         }
 
@@ -154,7 +174,9 @@ impl<T> ConcurrentOption<T> {
     }
 
     pub unsafe fn unwrap_unchecked(self) -> T {
-        self.value.assume_init_read()
+        self.written.store(false, Ordering::Relaxed);
+        let x = &mut *self.value.get();
+        x.assume_init_read()
     }
 
     pub fn and<U>(mut self, other: impl IntoOption<U>) -> Option<U> {

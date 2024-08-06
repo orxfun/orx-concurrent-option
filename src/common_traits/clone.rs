@@ -5,7 +5,7 @@ impl<T: Clone> Clone for ConcurrentOption<T> {
     fn clone(&self) -> Self {
         match self.written.load(Ordering::Relaxed) {
             true => {
-                let value = unsafe { self.value.assume_init_ref() }.clone();
+                let value = unsafe { self.value_ref() }.clone();
                 Self::some(value)
             }
             false => Self::none(),

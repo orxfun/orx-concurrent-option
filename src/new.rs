@@ -4,7 +4,7 @@ use std::mem::MaybeUninit;
 impl<T> ConcurrentOption<T> {
     pub fn some(value: T) -> Self {
         Self {
-            value: MaybeUninit::new(value),
+            value: MaybeUninit::new(value).into(),
             written: true.into(),
         }
     }

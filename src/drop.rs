@@ -4,7 +4,8 @@ use std::sync::atomic::Ordering;
 impl<T> Drop for ConcurrentOption<T> {
     fn drop(&mut self) {
         if self.written.load(Ordering::Relaxed) {
-            unsafe { self.value.assume_init_drop() };
+            let x = unsafe { &mut *self.value.get() };
+            unsafe { x.assume_init_drop() };
         }
     }
 }

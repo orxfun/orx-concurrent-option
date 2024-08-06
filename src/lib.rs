@@ -5,6 +5,7 @@ mod drop;
 mod into_option;
 mod new;
 mod option;
+mod raw;
 
 pub use common_traits::iter;
 

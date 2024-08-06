@@ -15,12 +15,13 @@ fn initiate_if_none() {
 }
 
 #[test]
+#[cfg(not(miri))]
 fn initiate_unchecked() {
-    // let x = ConcurrentOption::<String>::none();
-    // unsafe { x.initiate_unchecked(3.to_string()) };
-    // assert_eq!(x.as_ref(Ordering::Relaxed), Some(&3.to_string()));
+    let x = ConcurrentOption::<String>::none();
+    unsafe { x.initiate_unchecked(3.to_string()) };
+    assert_eq!(x.as_ref(Ordering::Relaxed), Some(&3.to_string()));
 
-    // let x = ConcurrentOption::some(7.to_string());
-    // unsafe { x.initiate_unchecked(3.to_string()) };
-    // assert_eq!(x.as_ref(Ordering::Relaxed), Some(&3.to_string()));
+    let x = ConcurrentOption::some(7.to_string());
+    unsafe { x.initiate_unchecked(3.to_string()) };
+    assert_eq!(x.as_ref(Ordering::Relaxed), Some(&3.to_string()));
 }

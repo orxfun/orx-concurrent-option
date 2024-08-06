@@ -20,7 +20,7 @@ fn concurrent_insert_if_none_single_writer(
             s.spawn(move || read(do_sleep, maybe_ref, read_order));
         }
 
-        s.spawn(move || write(do_sleep, maybe_ref));
+        s.spawn(move || write_single(do_sleep, maybe_ref));
 
         for _ in 0..(num_readers / 2) {
             s.spawn(move || read(do_sleep, maybe_ref, read_order));
@@ -45,7 +45,7 @@ fn concurrent_insert_if_none_multiple_writer(
 
     std::thread::scope(|s| {
         for _ in 0..(num_writers / 2) {
-            s.spawn(move || write(do_sleep, maybe_ref));
+            s.spawn(move || write_multi(do_sleep, maybe_ref));
         }
 
         for _ in 0..num_readers {
@@ -53,7 +53,7 @@ fn concurrent_insert_if_none_multiple_writer(
         }
 
         for _ in 0..(num_writers / 2) {
-            s.spawn(move || write(do_sleep, maybe_ref));
+            s.spawn(move || write_multi(do_sleep, maybe_ref));
         }
     });
 }
@@ -69,11 +69,31 @@ fn read(do_sleep: bool, maybe_ref: &ConcurrentOption<String>, read_order: Orderi
     }
 }
 
-fn write(do_sleep: bool, maybe_ref: &ConcurrentOption<String>) {
+fn write_single(do_sleep: bool, maybe_ref: &ConcurrentOption<String>) {
     for i in 0..100 {
         sleep(do_sleep);
-        if i == 50 {
-            maybe_ref.insert_if_none(7.to_string());
+        match i {
+            40 => {
+                let inserted = maybe_ref.insert_if_none(7.to_string());
+                assert!(inserted);
+            }
+            70 => {
+                let inserted = maybe_ref.insert_if_none(111.to_string());
+                assert!(!inserted);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn write_multi(do_sleep: bool, maybe_ref: &ConcurrentOption<String>) {
+    for i in 0..100 {
+        sleep(do_sleep);
+        match i {
+            40 | 70 => {
+                let _ = maybe_ref.insert_if_none(7.to_string());
+            }
+            _ => {}
         }
     }
 }

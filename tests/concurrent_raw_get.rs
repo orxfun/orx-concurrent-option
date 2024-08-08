@@ -74,11 +74,11 @@ fn write_single(do_sleep: bool, maybe_ref: &ConcurrentOption<String>) {
         sleep(do_sleep);
         match i {
             40 => {
-                let inserted = maybe_ref.initiate_if_none(7.to_string());
+                let inserted = maybe_ref.initialize_if_none(7.to_string());
                 assert!(inserted);
             }
             70 => {
-                let inserted = maybe_ref.initiate_if_none(111.to_string());
+                let inserted = maybe_ref.initialize_if_none(111.to_string());
                 assert!(!inserted);
             }
             _ => {}
@@ -91,7 +91,7 @@ fn write_multi(do_sleep: bool, maybe_ref: &ConcurrentOption<String>) {
         sleep(do_sleep);
         match i {
             40 | 70 => {
-                let _ = maybe_ref.initiate_if_none(7.to_string());
+                let _ = maybe_ref.initialize_if_none(7.to_string());
             }
             _ => {}
         }

@@ -12,7 +12,18 @@ fn iter_when_none() {
     let x = ConcurrentOption::<String>::none();
     validate(x.iter(Ordering::Relaxed));
     validate(x.iter(Ordering::Relaxed).rev());
-    validate(x.into_iter());
+    validate((&x).into_iter());
+
+    fn validate_value(mut iter: impl ExactSizeIterator<Item = String>) {
+        assert_eq!(iter.len(), 0);
+        assert!(iter.next().is_none());
+        assert!(iter.next().is_none());
+    }
+
+    let x = ConcurrentOption::<String>::none();
+    validate_value(x.iter(Ordering::Acquire).cloned());
+    validate_value(x.iter(Ordering::SeqCst).rev().cloned());
+    validate_value(x.into_iter());
 }
 
 #[test]
@@ -28,5 +39,18 @@ fn iter_when_some() {
     let x = ConcurrentOption::some(3.to_string());
     validate(x.iter(Ordering::Relaxed));
     validate(x.iter(Ordering::Relaxed).rev());
-    validate(x.into_iter());
+    validate((&x).into_iter());
+
+    fn validate_value(mut iter: impl ExactSizeIterator<Item = String>) {
+        assert_eq!(iter.len(), 1);
+        assert_eq!(iter.next(), Some(3.to_string()));
+        assert_eq!(iter.len(), 0);
+        assert!(iter.next().is_none());
+        assert!(iter.next().is_none());
+    }
+
+    let x = ConcurrentOption::some(3.to_string());
+    validate_value(x.iter(Ordering::Relaxed).cloned());
+    validate_value(x.iter(Ordering::SeqCst).rev().cloned());
+    validate_value(x.into_iter());
 }

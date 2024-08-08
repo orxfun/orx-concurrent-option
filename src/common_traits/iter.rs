@@ -21,8 +21,19 @@ impl<'a, T> IntoIterator for &'a mut ConcurrentOption<T> {
     }
 }
 
+impl<T> IntoIterator for ConcurrentOption<T> {
+    type Item = T;
+
+    type IntoIter = std::option::IntoIter<T>;
+
+    fn into_iter(mut self) -> Self::IntoIter {
+        self.take().into_iter()
+    }
+}
+
 // ITER
 
+/// Iterator over the `ConcurrentOption` yielding at most one element.
 pub struct Iter<'a, T> {
     pub(crate) maybe: Option<&'a T>,
 }
@@ -54,6 +65,7 @@ impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
 
 // ITER-MUT
 
+/// Mutable iterator over the `ConcurrentOption` yielding at most one element.
 pub struct IterMut<'a, T> {
     pub(crate) maybe: Option<&'a mut T>,
 }

@@ -1,8 +1,14 @@
 [package]
-name = "orx-concurrent-option"
-version = "0.1.0"
+name = "orx_concurrent_option"
+version = "1.0.0"
 edition = "2021"
-publish = ["artifactory"]
+authors = ["orxfun <orx.ugur.arikan@gmail.com>"]
+description = "A lock-free concurrent option type which enables to safely initialize and read the data concurrently."
+license = "MIT"
+repository = "https://github.com/orxfun/orx_concurrent_option/"
+keywords = ["concurrency", "option", "data-structures", "atomic", "lock-free"]
+categories = ["data-structures", "concurrency", "rust-patterns"]
+
 
 [dependencies]
 

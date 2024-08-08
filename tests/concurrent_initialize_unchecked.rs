@@ -7,7 +7,7 @@ use test_case::test_matrix;
     [false, true],
     [Ordering::SeqCst, Ordering::Acquire]
 )]
-fn concurrent_initiate_unchecked(num_readers: usize, do_sleep: bool, read_order: Ordering) {
+fn concurrent_initialize_unchecked(num_readers: usize, do_sleep: bool, read_order: Ordering) {
     let maybe = ConcurrentOption::<String>::none();
     let maybe_ref = &maybe;
 
@@ -39,7 +39,7 @@ fn write_single(do_sleep: bool, maybe_ref: &ConcurrentOption<String>) {
     for i in 0..100 {
         sleep(do_sleep);
         match i {
-            40 => unsafe { maybe_ref.initiate_unchecked(7.to_string()) },
+            40 => unsafe { maybe_ref.initialize_unchecked(7.to_string()) },
             _ => {}
         }
     }

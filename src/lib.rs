@@ -138,6 +138,7 @@ mod into_option;
 mod new;
 mod option;
 mod raw;
+mod states;
 
 pub use common_traits::iter;
 

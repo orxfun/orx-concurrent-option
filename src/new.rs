@@ -1,4 +1,5 @@
 use crate::concurrent_option::ConcurrentOption;
+use crate::states::*;
 use std::mem::MaybeUninit;
 
 impl<T> ConcurrentOption<T> {
@@ -20,7 +21,7 @@ impl<T> ConcurrentOption<T> {
     pub fn some(value: T) -> Self {
         Self {
             value: MaybeUninit::new(value).into(),
-            written: true.into(),
+            state: SOME.into(),
         }
     }
 
@@ -49,7 +50,7 @@ impl<T> ConcurrentOption<T> {
         let value = unsafe { value.assume_init() };
         Self {
             value,
-            written: false.into(),
+            state: NONE.into(),
         }
     }
 }

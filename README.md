@@ -5,15 +5,15 @@
 
 A lock-free concurrent option type which enables to safely initialize and read the data concurrently.
 
-## ConcurrentOption Methods In Three Groups
+## ConcurrentOption Methods In Four Groups
 
-### Methods requiring `mut self` or `self`
+### 1. Methods requiring `&mut self` or `self`
 
-Since these methods guarantee a unique access to the value, these methods are identical to those of the standard `Option`.
+Since these methods guarantee a unique access to the value, they are identical to those of the standard `Option`.
 
 Some such example methods are: `unwrap`, `take`, `insert`, etc.
 
-### Methods specialized for concurrent writing
+### 2. Methods specialized for concurrent writing
 
 These methods require a shared `&self` reference to update the state of the option concurrently.
 
@@ -21,7 +21,7 @@ Currently available methods are: `initialize_if_none` and `initialize_unchecked`
 
 See the example usage below.
 
-### Read methods requiring shared `&self` reference
+### 3. Read methods requiring shared `&self` reference
 
 These methods are similar to those of the standard `Option` except that they require an additional `Ordering` argument.
 
@@ -29,19 +29,27 @@ Some such example methods are: `is_some`, `is_none`, `as_ref`, `iter`, etc.
 
 Additional ordering is required since it is possible that the state of the option is being updated concurrently by specialized methods discussed above.
 
-* `Ordering::Relaxed` can be used when the state of the option is not changed concurrently.
+* `Ordering::Relaxed` can be used when the state of the option is not being changed concurrently.
 * However, it is recommended to use a stronger ordering such as `Ordering::Acquire` or `Ordering::SeqCst` when it is possible that the state of the option is being updated concurrently.
+
+### 4. Variants of the Common Trait Implementations
+
+`ConcurrentOption` implements common useful traits such as `Clone`, `PartialEq` or `PartialOrd`. Underlying implementations use the `Ordering::Relaxed` ordering while accessing the value of the option.
+
+However, in a concurrent setting, we might require to use a stronger ordering. Therefore, corresponding trait methods have variants ending with **_with_order** suffix and accepting an order as the argument to allow the caller to decide on the ordering.
+
+Some such example methods are: `clone_with_order`, `eq_with_order`, `partial_cmp_with_order`, `cmp_with_order`, etc.
 
 ## Example Concurrent Usage
 
 A toy concurrent program using the `ConcurrentOption` is demonstrated below:
 
-* there exist multiple readers checking the value of an optional; they will ive
+* there exist multiple readers checking the value of an optional; they will receive
   * None if the value is not initialized yet;
   * a reference to the value otherwise.
 * there exist multiple initializers each trying to set the value of optional;
   * only the first one will succeed,
-  * since this is an initialization method, succeeding calls will safely be red.
+  * since this is an initialization method, succeeding calls will safely be ignored.
 
 ```rust
 use orx_concurrent_option::*;

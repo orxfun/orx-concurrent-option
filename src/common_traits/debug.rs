@@ -1,4 +1,4 @@
-use crate::concurrent_option::ConcurrentOption;
+use crate::{concurrent_option::ConcurrentOption, states::SOME};
 use std::{fmt::Debug, sync::atomic::Ordering};
 
 impl<T: Debug> Debug for ConcurrentOption<T> {
@@ -26,9 +26,9 @@ impl<T: Debug> Debug for ConcurrentOption<T> {
     /// assert_eq!(y, "Some(\"3\")");
     /// ```
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.written.load(Ordering::Relaxed) {
-            true => write!(f, "ConcurrentSome({:?})", unsafe { self.value_ref() }),
-            false => write!(f, "ConcurrentNone"),
+        match self.state.load(Ordering::Relaxed) {
+            SOME => write!(f, "ConcurrentSome({:?})", unsafe { self.value_ref() }),
+            _ => write!(f, "ConcurrentNone"),
         }
     }
 }

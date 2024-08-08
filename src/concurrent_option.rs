@@ -1,4 +1,4 @@
-use std::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::AtomicBool};
+use std::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::AtomicU8};
 
 /// A lock-free concurrent option type which enables to safely initialize and read the data concurrently.
 ///
@@ -105,7 +105,7 @@ use std::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::AtomicBool};
 /// ```
 pub struct ConcurrentOption<T> {
     pub(crate) value: UnsafeCell<MaybeUninit<T>>,
-    pub(crate) written: AtomicBool,
+    pub(crate) state: AtomicU8,
 }
 
 impl<T> ConcurrentOption<T> {

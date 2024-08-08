@@ -1,4 +1,4 @@
-use crate::ConcurrentOption;
+use crate::{states::*, ConcurrentOption};
 use std::sync::atomic::Ordering;
 
 impl<T> ConcurrentOption<T> {
@@ -24,12 +24,12 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(unsafe { p.unwrap().as_ref() }, Some(&3.to_string()));
     /// ```
     pub fn raw_get(&self, order: Ordering) -> Option<*const T> {
-        match self.written.load(order) {
-            true => {
+        match self.state.load(order) {
+            SOME => {
                 let x = unsafe { &*self.value.get() };
                 Some(x.as_ptr())
             }
-            false => None,
+            _ => None,
         }
     }
 
@@ -61,12 +61,12 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(x.as_ref(Ordering::Relaxed), Some(&7.to_string()));
     /// ```
     pub fn raw_get_mut(&self, order: Ordering) -> Option<*mut T> {
-        match self.written.load(order) {
-            true => {
+        match self.state.load(order) {
+            SOME => {
                 let x = unsafe { &mut *self.value.get() };
                 Some(x.as_mut_ptr())
             }
-            false => None,
+            _ => None,
         }
     }
 }

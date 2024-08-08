@@ -1,4 +1,4 @@
-use crate::ConcurrentOption;
+use crate::{states::*, ConcurrentOption};
 use std::sync::atomic::Ordering;
 
 impl<T> ConcurrentOption<T> {
@@ -106,12 +106,17 @@ impl<T> ConcurrentOption<T> {
         const ORDER_LOAD: Ordering = Ordering::SeqCst;
         const ORDER_STORE: Ordering = Ordering::SeqCst;
 
-        match self.written.load(ORDER_LOAD) {
-            true => false,
-            false => {
-                let x = unsafe { &mut *self.value.get() };
-                x.write(value);
-                self.written.store(true, ORDER_STORE);
+        match self
+            .state
+            .compare_exchange(NONE, WRITING, ORDER_LOAD, ORDER_LOAD)
+            .is_ok()
+        {
+            false => false,
+            true => {
+                unsafe { &mut *self.value.get() }.write(value);
+                self.state
+                    .compare_exchange(WRITING, SOME, ORDER_STORE, ORDER_STORE)
+                    .expect("Failed to update the concurrent state on `initialize_if_none`.");
                 true
             }
         }
@@ -224,25 +229,29 @@ impl<T> ConcurrentOption<T> {
     pub unsafe fn initialize_unchecked(&self, value: T) {
         const ORDER_STORE: Ordering = Ordering::SeqCst;
 
-        let x = unsafe { &mut *self.value.get() };
-        x.write(value);
-        self.written.store(true, ORDER_STORE);
+        unsafe { &mut *self.value.get() }.write(value);
+        self.state.store(SOME, ORDER_STORE);
     }
 
     #[cfg(feature = "experimental")]
     pub unsafe fn take_x(&self) -> Option<T> {
         const ORDER_LOAD: Ordering = Ordering::SeqCst;
+        const ORDER_STORE: Ordering = Ordering::SeqCst;
 
-        let x = self
-            .written
-            .compare_exchange(true, false, ORDER_LOAD, ORDER_LOAD);
-
-        match x.is_ok() {
+        match self
+            .state
+            .compare_exchange(SOME, WRITING, ORDER_LOAD, ORDER_LOAD)
+            .is_ok()
+        {
+            false => None,
             true => {
                 let x = unsafe { &*self.value.get() };
-                Some(std::mem::MaybeUninit::assume_init_read(x))
+                let x = Some(std::mem::MaybeUninit::assume_init_read(x));
+                self.state
+                    .compare_exchange(WRITING, NONE, ORDER_STORE, ORDER_STORE)
+                    .expect("Failed to update the concurrent state on `initialize_if_none`.");
+                x
             }
-            false => None,
         }
     }
 

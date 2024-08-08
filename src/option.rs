@@ -1,4 +1,4 @@
-use crate::{concurrent_option::ConcurrentOption, IntoOption};
+use crate::{concurrent_option::ConcurrentOption, states::*, IntoOption};
 use std::{
     mem::MaybeUninit,
     ops::{Deref, DerefMut},
@@ -25,7 +25,7 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(x.is_some(Ordering::SeqCst), false);
     /// ```
     pub fn is_some(&self, order: Ordering) -> bool {
-        self.written.load(order)
+        self.state.load(order) == SOME
     }
 
     /// Returns `true` if the option is a None variant.
@@ -45,7 +45,7 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(x.is_none(Ordering::SeqCst), true);
     /// ```
     pub fn is_none(&self, order: Ordering) -> bool {
-        !self.written.load(order)
+        self.state.load(order) == NONE
     }
 
     /// Converts from `&Option<T>` to `Option<&T>`.
@@ -65,9 +65,9 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(x.as_ref(Ordering::Acquire), None);
     /// ```
     pub fn as_ref(&self, order: Ordering) -> Option<&T> {
-        match self.written.load(order) {
-            true => Some(unsafe { self.value_ref() }),
-            false => None,
+        match self.state.load(order) {
+            SOME => Some(unsafe { self.value_ref() }),
+            _ => None,
         }
     }
 
@@ -94,9 +94,9 @@ impl<T> ConcurrentOption<T> {
     where
         T: Deref,
     {
-        match self.written.load(order) {
-            true => Some(unsafe { self.value_ref() }),
-            false => None,
+        match self.state.load(order) {
+            SOME => Some(unsafe { self.value_ref() }),
+            _ => None,
         }
     }
 
@@ -169,9 +169,9 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(x.as_ref(Ordering::Relaxed), Some(&42));
     /// ```
     pub fn as_mut(&mut self) -> Option<&mut T> {
-        match self.written.load(Ordering::Relaxed) {
-            true => Some(unsafe { (*self.value.get()).assume_init_mut() }),
-            false => None,
+        match self.state.load(Ordering::Relaxed) {
+            SOME => Some(unsafe { (*self.value.get()).assume_init_mut() }),
+            _ => None,
         }
     }
 
@@ -196,7 +196,7 @@ impl<T> ConcurrentOption<T> {
         match self.is_some(Ordering::Relaxed) {
             false => None,
             true => {
-                self.written.store(false, Ordering::Relaxed);
+                self.state.store(NONE, Ordering::Relaxed);
                 let x = unsafe { &mut *self.value.get() };
                 Some(unsafe { x.assume_init_read() })
             }
@@ -283,17 +283,21 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(old, None);
     /// ```
     pub fn replace(&mut self, value: T) -> Option<T> {
-        match self.written.load(Ordering::Relaxed) {
-            true => {
+        match self.state.load(Ordering::Relaxed) {
+            SOME => {
+                self.state.store(WRITING, Ordering::Relaxed);
                 let x = unsafe { (*self.value.get()).assume_init_mut() };
                 let old = std::mem::replace(x, value);
+                self.state.store(SOME, Ordering::Relaxed);
                 Some(old)
             }
-            false => {
+            NONE => {
+                self.state.store(WRITING, Ordering::Relaxed);
                 self.value = MaybeUninit::new(value).into();
-                self.written.store(true, Ordering::Relaxed);
+                self.state.store(SOME, Ordering::Relaxed);
                 None
             }
+            _ => panic!("ConcurrentOption value is `replace`d while its value is being written."),
         }
     }
 
@@ -323,15 +327,19 @@ impl<T> ConcurrentOption<T> {
     /// ```
     #[allow(clippy::missing_panics_doc)]
     pub fn insert(&mut self, value: T) -> &mut T {
-        match self.written.load(Ordering::Relaxed) {
-            true => {
+        match self.state.load(Ordering::Relaxed) {
+            SOME => {
+                self.state.store(WRITING, Ordering::Relaxed);
                 let x = unsafe { (*self.value.get()).assume_init_mut() };
                 let _ = std::mem::replace(x, value);
+                self.state.store(SOME, Ordering::Relaxed);
             }
-            false => {
+            NONE => {
+                self.state.store(WRITING, Ordering::Relaxed);
                 self.value = MaybeUninit::new(value).into();
-                self.written.store(true, Ordering::Relaxed);
+                self.state.store(SOME, Ordering::Relaxed);
             }
+            _ => panic!("ConcurrentOption value is `insert`ed while its value is being written."),
         }
 
         self.as_mut().expect("should be some")
@@ -387,12 +395,18 @@ impl<T> ConcurrentOption<T> {
     where
         F: FnOnce() -> T,
     {
-        if !self.written.load(Ordering::Relaxed) {
-            self.value = MaybeUninit::new(f()).into();
-            self.written.store(true, Ordering::Relaxed);
+        match self.state.load(Ordering::Relaxed) {
+            SOME => self.as_mut().expect("is guaranteed to be some"),
+            NONE => {
+                self.state.store(WRITING, Ordering::Relaxed);
+                self.value = MaybeUninit::new(f()).into();
+                self.state.store(SOME, Ordering::Relaxed);
+                self.as_mut().expect("is guaranteed to be some")
+            }
+            _ => panic!(
+                "ConcurrentOption `get_or_insert_with` is called while its value is being written."
+            ),
         }
-
-        self.as_mut().expect("is guaranteed to be some")
     }
 
     // self
@@ -538,7 +552,7 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(unsafe { x.unwrap_unchecked() }, "air"); // Undefined behavior!
     /// ```
     pub unsafe fn unwrap_unchecked(self) -> T {
-        self.written.store(false, Ordering::Relaxed);
+        self.state.store(NONE, Ordering::Relaxed);
         let x = &mut *self.value.get();
         x.assume_init_read()
     }

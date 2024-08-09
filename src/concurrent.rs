@@ -105,20 +105,27 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(maybe.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
     /// ```
     pub fn initialize_if_none(&self, value: T) -> bool {
-        match self
-            .state
-            .compare_exchange(NONE, RESERVED_FOR_READING, ORDER_LOAD, ORDER_LOAD)
-            .is_ok()
-        {
-            false => false,
-            true => {
+        match self.mut_handle(NONE, SOME) {
+            None => false,
+            Some(_handle) => {
                 unsafe { &mut *self.value.get() }.write(value);
-                self.state
-                    .compare_exchange(RESERVED_FOR_READING, SOME, ORDER_STORE, ORDER_STORE)
-                    .expect("Failed to update the concurrent state on `initialize_if_none`.");
                 true
             }
         }
+        // match self
+        //     .state
+        //     .compare_exchange(NONE, RESERVED, ORDER_LOAD, ORDER_LOAD)
+        //     .is_ok()
+        // {
+        //     false => false,
+        //     true => {
+        //         unsafe { &mut *self.value.get() }.write(value);
+        //         self.state
+        //             .compare_exchange(RESERVED, SOME, ORDER_STORE, ORDER_STORE)
+        //             .expect("Failed to update the concurrent state on `initialize_if_none`.");
+        //         true
+        //     }
+        // }
     }
 
     /// Thread safe method to initiate the value of the option with the given `value`
@@ -265,22 +272,31 @@ impl<T> ConcurrentOption<T> {
     where
         F: FnOnce(&T) -> U,
     {
-        match self
-            .state
-            .compare_exchange(SOME, RESERVED_FOR_READING, ORDER_LOAD, ORDER_LOAD)
-            .is_ok()
-        {
-            false => None,
-            true => {
+        match self.mut_handle(SOME, SOME) {
+            None => None,
+            Some(_handle) => {
                 let x = unsafe { &*self.value.get() };
                 let x = unsafe { std::mem::MaybeUninit::assume_init_ref(x) };
-                let y = f(x);
-                self.state
-                    .compare_exchange(RESERVED_FOR_READING, SOME, ORDER_STORE, ORDER_STORE)
-                    .expect("Failed to update the concurrent state on `initialize_if_none`.");
-                Some(y)
+                Some(f(x))
             }
         }
+
+        // match self
+        //     .state
+        //     .compare_exchange(SOME, RESERVED, ORDER_LOAD, ORDER_LOAD)
+        //     .is_ok()
+        // {
+        //     false => None,
+        //     true => {
+        //         let x = unsafe { &*self.value.get() };
+        //         let x = unsafe { std::mem::MaybeUninit::assume_init_ref(x) };
+        //         Some(f(x))f(x);
+        //         self.state
+        //             .compare_exchange(RESERVED, SOME, ORDER_STORE, ORDER_STORE)
+        //             .expect("Failed to update the concurrent state on `initialize_if_none`.");
+        //         Some(y)
+        //     }
+        // }
     }
 
     // concurrent state mutation
@@ -306,21 +322,85 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(y, None);
     /// ```
     pub fn take(&self) -> Option<T> {
+        match self.mut_handle(SOME, NONE) {
+            None => None,
+            Some(_handle) => {
+                let x = unsafe { &*self.value.get() };
+                Some(unsafe { std::mem::MaybeUninit::assume_init_read(x) })
+            }
+        }
+        // match self
+        //     .state
+        //     .compare_exchange(SOME, RESERVED, ORDER_LOAD, ORDER_LOAD)
+        //     .is_ok()
+        // {
+        //     false => None,
+        //     true => {
+        //         let x = unsafe { &*self.value.get() };
+        //         let x = Some(unsafe { std::mem::MaybeUninit::assume_init_read(x) });
+        //         self.state
+        //             .compare_exchange(RESERVED, NONE, ORDER_STORE, ORDER_STORE)
+        //             .expect("Failed to update the concurrent state on `initialize_if_none`.");
+        //         x
+        //     }
+        // }
+    }
+
+    /// Takes the value out of the option, but only if the predicate evaluates to
+    /// `true` on a mutable reference to the value.
+    ///
+    /// In other words, replaces `self` with None if the predicate returns `true`.
+    /// This method operates similar to [`ConcurrentOption::take`] but conditional.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use orx_concurrent_option::*;
+    ///
+    /// let mut x = ConcurrentOption::some(42);
+    ///
+    /// let prev = x.exclusive_take_if(|v| if *v == 42 {
+    ///     *v += 1;
+    ///     false
+    /// } else {
+    ///     false
+    /// });
+    /// assert_eq!(x, ConcurrentOption::some(43));
+    /// assert_eq!(prev, None);
+    ///
+    /// let prev = x.exclusive_take_if(|v| *v == 43);
+    /// assert_eq!(x, ConcurrentOption::none());
+    /// assert_eq!(prev, Some(43));
+    /// ```
+    pub fn take_if<P>(&mut self, predicate: P) -> Option<T>
+    where
+        P: FnOnce(&mut T) -> bool,
+    {
         match self
             .state
-            .compare_exchange(SOME, RESERVED_FOR_READING, ORDER_LOAD, ORDER_LOAD)
+            .compare_exchange(SOME, RESERVED, ORDER_LOAD, ORDER_LOAD)
             .is_ok()
         {
             false => None,
             true => {
-                let x = unsafe { &*self.value.get() };
-                let x = Some(unsafe { std::mem::MaybeUninit::assume_init_read(x) });
-                self.state
-                    .compare_exchange(RESERVED_FOR_READING, NONE, ORDER_STORE, ORDER_STORE)
-                    .expect("Failed to update the concurrent state on `initialize_if_none`.");
-                x
+                let x = unsafe { &mut *self.value.get() };
+                let x = unsafe { std::mem::MaybeUninit::assume_init_mut(x) };
+                match predicate(x) {
+                    true => {
+                        todo!()
+                    }
+                    false => None,
+                }
+                // self.state
+                //     .compare_exchange(RESERVED, NONE, ORDER_STORE, ORDER_STORE)
+                //     .expect("Failed to update the concurrent state on `initialize_if_none`.");
+                // x
             }
         }
+        // match self.exclusive_as_mut().map_or(false, predicate) {
+        //     true => self.exclusive_take(),
+        //     false => None,
+        // }
     }
 
     // common traits

@@ -135,6 +135,7 @@ mod concurrent;
 mod concurrent_option;
 mod drop;
 mod into_option;
+mod mut_handle;
 mod new;
 mod option;
 mod raw;

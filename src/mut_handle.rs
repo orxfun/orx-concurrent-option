@@ -8,15 +8,19 @@ pub(crate) struct MutHandle<'a> {
 
 impl<'a> MutHandle<'a> {
     pub fn try_get(state: &'a AtomicU8, initial_state: u8, success_state: u8) -> Option<Self> {
-        match state
-            .compare_exchange(initial_state, RESERVED, ORDER_LOAD, ORDER_LOAD)
-            .is_ok()
-        {
-            true => Some(Self {
-                state,
-                success_state,
-            }),
-            false => None,
+        loop {
+            match state.compare_exchange(initial_state, RESERVED, ORDER_LOAD, ORDER_LOAD) {
+                Ok(_) => {
+                    return Some(Self {
+                        state,
+                        success_state,
+                    })
+                }
+                Err(previous_state) => match previous_state {
+                    RESERVED => continue,
+                    _ => return None,
+                },
+            }
         }
     }
 }

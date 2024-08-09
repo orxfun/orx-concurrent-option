@@ -6,10 +6,6 @@ impl<T> ConcurrentOption<T> {
 
     /// Returns `true` if the option is a Some variant.
     ///
-    /// See [`is_some_with_order`] to explicitly set the ordering.
-    ///
-    /// [`is_some_with_order`]: ConcurrentOption::is_some_with_order
-    ///
     /// # Examples
     ///
     /// ```
@@ -28,10 +24,6 @@ impl<T> ConcurrentOption<T> {
     }
 
     /// Returns `true` if the option is a None variant.
-    ///
-    /// See [`is_none_with_order`] to explicitly set the ordering.
-    ///
-    /// [`is_none_with_order`]: ConcurrentOption::is_none_with_order
     ///
     /// # Examples
     ///

@@ -3,17 +3,17 @@
 //! [![orx-concurrent-option crate](https://img.shields.io/crates/v/orx-concurrent-option.svg)](https://crates.io/crates/orx-concurrent-option)
 //! [![orx-concurrent-option documentation](https://docs.rs/orx-concurrent-option/badge.svg)](https://docs.rs/orx-concurrent-option)
 //!
-//! ConcurrentOption is a lock-free concurrent read and write option type.
+//! ConcurrentOption is a thread-safe and lock-free read-write option type.
 //!
 //! ## ConcurrentOption Methods In Groups
 //!
-//! ConcurrentOption methods are based on the standard Option with minor choices to better fit concurrent usage.
+//! ConcurrentOption methods are based on the standard Option with minor differences in order to better fit concurrent programs.
 //!
 //! For example, instead of `fn map<U, F>(self, f: F) -> Option<U>`
-//! * ConcurrentOption implements `fn map<U, F>(&self, f: F) -> Option<U>` which is specialized to map over the reference while guaranteeing the lack of a data race.
+//! * ConcurrentOption implements `fn map<U, F>(&self, f: F) -> Option<U>` which is specialized to map over the reference while guaranteeing the lack of data race.
 //! * Note that the prior result can trivially be obtained by `maybe.exclusive_take().map(f)` when we have the ownership.
 //!
-//! ### Methods requiring self or &mut self
+//! ### ⬤ Methods requiring self or &mut self
 //!
 //! These methods are safe by the borrow checker and they behave similar to the original variants.
 //!
@@ -21,7 +21,7 @@
 //!
 //! Some such methods are `unwrap`, `expect`, `exclusive_mut` or `exclusive_take`.
 //!
-//! ### Thread safe versions of mutating methods
+//! ### ⬤ Thread safe versions of mutating methods
 //!
 //! Thread safe variants of mutating methods are available and they can be safely be called with a shared `&self` reference.
 //!
@@ -29,7 +29,7 @@
 //!
 //! These methods guarantee that there exist no other mutation or no reading during the mutation.
 //!
-//! ### Thread safe versions of read methods
+//! ### ⬤ Thread safe versions of read methods
 //!
 //! Thread safe variants of methods which access the underlying value to calculate a result are available.
 //!
@@ -37,7 +37,7 @@
 //!
 //! These methods guarantee that there exist no mutation while reading the data.
 //!
-//! ### Partially thread safe methods
+//! ### ⬤ Partially thread safe methods
 //!
 //! Methods which return a shared reference `&T` or mutable reference `&mut T` to the underlying value of the optional are marked as `unsafe`.
 //!
@@ -47,7 +47,7 @@
 //!
 //! Some example methods are `as_ref`, `as_deref`, `insert`, etc.
 //!
-//! ### Methods to allow manual control on concurrency
+//! ### ⬤ Methods to allow manual control on concurrency
 //!
 //! ConcurrentOption also exposes methods which accepts a `std::sync::atomic::Ordering` and gives the control to the caller. These methods are suffixed with **with_order**, except for the state.
 //!
@@ -56,6 +56,8 @@
 //! ## Examples
 //!
 //! ### Concurrent Read & Write
+//!
+//! The following example demonstrates the ease of concurrently mutating the state of the option while safely reading the underlying data with multiple reader and writer threads.
 //!
 //! ```rust
 //! use orx_concurrent_option::*;

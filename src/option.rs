@@ -133,19 +133,28 @@ impl<T> ConcurrentOption<T> {
         }
     }
 
-    /// Returns an iterator over the possibly contained value; yields
+    /// Partially thread safe method to return an iterator over the possibly contained value; yields
     /// * the single element if the option is of Some variant;
     /// * no elements otherwise.
     ///
-    /// See [`iter_with_order`] to explicitly set the ordering.
+    /// # Safety
     ///
-    /// [`iter_with_order`]: ConcurrentOption::iter_with_order
+    /// Note that creating a valid reference part of this method is thread safe.
+    ///
+    /// The method is `unsafe` due to the returned reference to the underlying value.
+    ///
+    /// * It is safe to use this method if the returned reference is discarded (miri would still complain).
+    /// * It is also safe to use this method if the caller is able to guarantee that there exist
+    /// no concurrent writes while holding onto this reference.
+    ///   * One such case is using `as_ref` together with `initialize_when_none` method.
+    /// This is perfectly safe since the value will be written only once,
+    /// and `as_ref` returns a valid reference only after the value is initialized.
+    /// * Otherwise, it will lead to an **Undefined Behavior** due to data race.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
     ///
     /// fn validate<'a>(mut iter: impl ExactSizeIterator<Item = &'a String>) {
     ///     assert_eq!(iter.len(), 0);
@@ -154,13 +163,14 @@ impl<T> ConcurrentOption<T> {
     /// }
     ///
     /// let x = ConcurrentOption::<String>::none();
-    /// validate(x.iter());
-    /// validate(x.iter().rev());
+    /// validate(unsafe { x.iter() });
+    /// validate(unsafe { x.iter() }.rev());
     /// validate((&x).into_iter());
     /// ```
-    #[inline]
-    pub fn iter(&self) -> crate::iter::Iter<'_, T> {
-        self.iter_with_order(ORDER_LOAD)
+    pub unsafe fn iter(&self) -> crate::iter::Iter<'_, T> {
+        crate::iter::Iter {
+            maybe: self.as_ref(),
+        }
     }
 
     // &self - with-order
@@ -202,7 +212,7 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(x.is_none_with_order(Ordering::SeqCst), true);
     /// ```
     pub fn is_none_with_order(&self, order: Ordering) -> bool {
-        self.state.load(order) == NONE
+        self.state.load(order) != SOME
     }
 
     /// Converts from `&Option<T>` to `Option<&T>`.

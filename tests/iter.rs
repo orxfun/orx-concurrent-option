@@ -10,7 +10,7 @@ fn iter_with_order_when_none() {
     }
 
     let x = ConcurrentOption::<String>::none();
-    validate(x.iter_with_order(Ordering::Relaxed));
+    validate(unsafe { x.iter() });
     validate(x.iter_with_order(Ordering::Relaxed).rev());
     validate((&x).into_iter());
 
@@ -22,7 +22,7 @@ fn iter_with_order_when_none() {
 
     let x = ConcurrentOption::<String>::none();
     validate_value(x.iter_with_order(Ordering::Acquire).cloned());
-    validate_value(x.iter_with_order(Ordering::SeqCst).rev().cloned());
+    validate_value(unsafe { x.iter() }.rev().cloned());
     validate_value(x.into_iter());
 }
 

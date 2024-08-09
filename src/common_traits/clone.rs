@@ -1,5 +1,4 @@
-use crate::{states::SOME, ConcurrentOption};
-use std::sync::atomic::Ordering;
+use crate::ConcurrentOption;
 
 impl<T: Clone> Clone for ConcurrentOption<T> {
     /// Clones the concurrent option with the [`Relaxed`] ordering.
@@ -23,12 +22,9 @@ impl<T: Clone> Clone for ConcurrentOption<T> {
     /// assert_eq!(x, y);
     /// ```
     fn clone(&self) -> Self {
-        match self.state.load(Ordering::Relaxed) {
-            SOME => {
-                let value = unsafe { self.value_ref() }.clone();
-                Self::some(value)
-            }
-            _ => Self::none(),
+        match unsafe { self.as_ref() } {
+            Some(x) => Self::some(x.clone()),
+            None => Self::none(),
         }
     }
 }

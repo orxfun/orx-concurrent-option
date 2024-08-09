@@ -53,27 +53,41 @@ impl<T> ConcurrentOption<T> {
         self.is_none_with_order(ORDER_LOAD)
     }
 
-    /// Converts from `&Option<T>` to `Option<&T>`.
+    /// Partially thread safe method to convert from `&Option<T>` to `Option<&T>`.
     ///
-    /// See [`as_ref_with_order`] to explicitly set the ordering.
+    /// # Safety
     ///
-    /// [`as_ref_with_order`]: ConcurrentOption::as_ref_with_order
+    /// Note that creating a valid reference part of this method is thread safe.
+    ///
+    /// The method is `unsafe` due to the returned reference to the underlying value.
+    ///
+    /// * It is safe to use this method if the returned reference is discarded (miri would still complain).
+    /// * It is also safe to use this method if the caller is able to guarantee that there exist
+    /// no concurrent writes while holding onto this reference.
+    ///   * One such case is using `as_ref` together with `initialize_when_none` method.
+    /// This is perfectly safe since the value will be written only once,
+    /// and `as_ref` returns a valid reference only after the value is initialized.
+    /// * Otherwise, it will lead to an **Undefined Behavior** due to data race.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
     ///
     /// let x = ConcurrentOption::some(3.to_string());
-    /// assert_eq!(x.as_ref(), Some(&3.to_string()));
+    /// assert_eq!(unsafe { x.as_ref() }, Some(&3.to_string()));
     ///
     /// _ = x.take();
-    /// assert_eq!(x.as_ref(), None);
+    /// assert_eq!(unsafe { x.as_ref() }, None);
     /// ```
-    #[inline]
-    pub fn as_ref(&self) -> Option<&T> {
-        self.as_ref_with_order(ORDER_LOAD)
+    pub unsafe fn as_ref(&self) -> Option<&T> {
+        match self.mut_handle(SOME, SOME) {
+            Some(_handle) => {
+                let x = &*self.value.get();
+                Some(x.assume_init_ref())
+            }
+            None => None,
+        }
     }
 
     /// Converts from `Option<T>` (or `&Option<T>`) to `Option<&T::Target>`.
@@ -187,15 +201,18 @@ impl<T> ConcurrentOption<T> {
     /// use orx_concurrent_option::*;
     /// use std::sync::atomic::Ordering;
     ///
-    /// let mut x = ConcurrentOption::some(3.to_string());
-    /// assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
+    /// let x = ConcurrentOption::some(3.to_string());
+    /// assert_eq!(unsafe { x.as_ref_with_order(Ordering::Relaxed) }, Some(&3.to_string()));
     ///
     /// _ = x.take();
-    /// assert_eq!(x.as_ref_with_order(Ordering::Acquire), None);
+    /// assert_eq!(unsafe { x.as_ref_with_order(Ordering::Acquire) }, None);
     /// ```
-    pub fn as_ref_with_order(&self, order: Ordering) -> Option<&T> {
+    pub unsafe fn as_ref_with_order(&self, order: Ordering) -> Option<&T> {
         match self.state.load(order) {
-            SOME => Some(unsafe { self.value_ref() }),
+            SOME => {
+                let x = &*self.value.get();
+                Some(x.assume_init_ref())
+            }
             _ => None,
         }
     }
@@ -253,7 +270,7 @@ impl<T> ConcurrentOption<T> {
     /// validate((&x).into_iter());
     /// ```
     pub fn iter_with_order(&self, order: Ordering) -> crate::iter::Iter<'_, T> {
-        let maybe = self.as_ref_with_order(order);
+        let maybe = unsafe { self.as_ref_with_order(order) };
         crate::iter::Iter { maybe }
     }
 
@@ -288,14 +305,13 @@ impl<T> ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
     ///
     /// let mut x = ConcurrentOption::some(2);
     /// match x.exclusive_as_mut() {
     ///     Some(v) => *v = 42,
     ///     None => {},
     /// }
-    /// assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&42));
+    /// assert_eq!(unsafe { x.as_ref() }, Some(&42));
     /// ```
     pub fn exclusive_as_mut(&mut self) -> Option<&mut T> {
         match self.state.load(Ordering::Relaxed) {
@@ -441,13 +457,12 @@ impl<T> ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
     ///
     /// let mut opt: ConcurrentOption<_> = ConcurrentOption::none();
     ///
     /// let val = opt.exclusive_insert(1);
     /// assert_eq!(*val, 1);
-    /// assert_eq!(opt.as_ref_with_order(Ordering::Relaxed), Some(&1));
+    /// assert_eq!(unsafe { opt.as_ref() }, Some(&1));
     ///
     /// let val = opt.exclusive_insert(2);
     /// assert_eq!(*val, 2);
@@ -1065,7 +1080,7 @@ impl<T> ConcurrentOption<&T> {
     ///
     /// let x = 12;
     /// let opt_x = ConcurrentOption::some(&x);
-    /// assert_eq!(opt_x.as_ref_with_order(Ordering::Relaxed), Some(&&12));
+    /// assert_eq!(unsafe { opt_x.as_ref() }, Some(&&12));
     ///
     /// let cloned = opt_x.cloned();
     /// assert_eq!(cloned, Some(12));
@@ -1084,11 +1099,10 @@ impl<T> ConcurrentOption<&T> {
     ///
     /// ```
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
     ///
     /// let x = 12;
     /// let opt_x = ConcurrentOption::some(&x);
-    /// assert_eq!(opt_x.as_ref_with_order(Ordering::Relaxed), Some(&&12));
+    /// assert_eq!(unsafe { opt_x.as_ref() }, Some(&&12));
     ///
     /// let copied = opt_x.copied();
     /// assert_eq!(copied, Some(12));

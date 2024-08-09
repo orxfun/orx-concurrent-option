@@ -28,7 +28,7 @@ fn concurrent_initialize_unchecked(num_readers: usize, do_sleep: bool, read_orde
 fn read(do_sleep: bool, maybe_ref: &ConcurrentOption<String>, read_order: Ordering) {
     for _ in 0..100 {
         sleep(do_sleep);
-        let read = maybe_ref.as_ref_with_order(read_order);
+        let read = unsafe { maybe_ref.as_ref_with_order(read_order) };
         let is_none = read.is_none();
         let is_seven = read == Some(&7.to_string());
         assert!(is_none || is_seven);

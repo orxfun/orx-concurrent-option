@@ -24,10 +24,10 @@ fn is_none() {
 #[test]
 fn as_ref() {
     let mut x = ConcurrentOption::some(3.to_string());
-    assert_eq!(x.as_ref(), Some(&3.to_string()));
+    assert_eq!(unsafe { x.as_ref() }, Some(&3.to_string()));
 
     _ = x.exclusive_take();
-    assert_eq!(x.as_ref(), None);
+    assert_eq!(unsafe { x.as_ref() }, None);
 }
 
 #[test]
@@ -53,10 +53,13 @@ fn is_none_with_order() {
 #[test]
 fn as_ref_with_order() {
     let mut x = ConcurrentOption::some(3.to_string());
-    assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
+    assert_eq!(
+        unsafe { x.as_ref_with_order(Ordering::Relaxed) },
+        Some(&3.to_string())
+    );
 
     _ = x.exclusive_take();
-    assert_eq!(x.as_ref_with_order(Ordering::Relaxed), None);
+    assert_eq!(unsafe { x.as_ref_with_order(Ordering::Relaxed) }, None);
 }
 
 #[test]
@@ -178,7 +181,7 @@ fn exclusive_insert() {
     let mut opt = ConcurrentOption::<u32>::none();
     let val = opt.exclusive_insert(1);
     assert_eq!(*val, 1);
-    assert_eq!(opt.as_ref_with_order(Ordering::Relaxed), Some(&1));
+    assert_eq!(unsafe { opt.as_ref() }, Some(&1));
     let val = opt.exclusive_insert(2);
     assert_eq!(*val, 2);
     *val = 3;
@@ -455,7 +458,7 @@ fn xor() {
     let mut opt = ConcurrentOption::<i32>::none();
     let val = opt.exclusive_insert(1);
     assert_eq!(*val, 1);
-    assert_eq!(opt.as_ref_with_order(Ordering::Relaxed), Some(&1));
+    assert_eq!(unsafe { opt.as_ref() }, Some(&1));
     let val = opt.exclusive_insert(2);
     assert_eq!(*val, 2);
     *val = 3;

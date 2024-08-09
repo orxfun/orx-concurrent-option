@@ -42,7 +42,7 @@ fn raw_get_mut() {
     let p = x.raw_get_mut();
     let p = p.unwrap();
     let _ = unsafe { p.replace(7.to_string()) }; // only write leads to memory leak
-    assert_eq!(x.as_ref(), Some(&7.to_string()));
+    assert_eq!(unsafe { x.as_ref() }, Some(&7.to_string()));
 }
 
 #[test]
@@ -62,5 +62,5 @@ fn raw_get_mut_with_order() {
     let p = x.raw_get_mut_with_order(Ordering::Relaxed);
     let p = p.unwrap();
     let _ = unsafe { p.replace(7.to_string()) }; // only write leads to memory leak
-    assert_eq!(x.as_ref(), Some(&7.to_string()));
+    assert_eq!(unsafe { x.as_ref() }, Some(&7.to_string()));
 }

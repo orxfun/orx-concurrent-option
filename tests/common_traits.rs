@@ -7,14 +7,14 @@ fn clone() {
     let y = x.clone();
 
     assert!(y.is_some_with_order(Ordering::Relaxed));
-    assert_eq!(y.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
+    assert_eq!(unsafe { y.as_ref() }, Some(&3.to_string()));
     assert_eq!(x, y);
 
     let x = ConcurrentOption::<String>::none();
     let y = x.clone();
 
     assert!(y.is_none_with_order(Ordering::Relaxed));
-    assert_eq!(y.as_ref_with_order(Ordering::Relaxed), None);
+    assert_eq!(unsafe { y.as_ref() }, None);
     assert_eq!(x, y);
 }
 
@@ -89,13 +89,13 @@ fn eq() {
 #[test]
 fn from() {
     let x: ConcurrentOption<String> = 3.to_string().into();
-    assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
+    assert_eq!(unsafe { x.as_ref() }, Some(&3.to_string()));
 
     let x: ConcurrentOption<String> = Some(3.to_string()).into();
-    assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
+    assert_eq!(unsafe { x.as_ref() }, Some(&3.to_string()));
 
     let x: ConcurrentOption<String> = None.into();
-    assert_eq!(x.as_ref_with_order(Ordering::Relaxed), None);
+    assert_eq!(unsafe { x.as_ref() }, None);
 }
 
 #[test]

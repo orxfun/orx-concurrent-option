@@ -25,17 +25,16 @@ impl<T> ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
     ///
     /// let x = ConcurrentOption::<String>::none();
     /// let inserted = x.initialize_if_none(3.to_string());
     /// assert!(inserted);
-    /// assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
+    /// assert_eq!(unsafe { x.as_ref() }, Some(&3.to_string()));
     ///
     /// let x = ConcurrentOption::some(7.to_string());
     /// let inserted = x.initialize_if_none(3.to_string()); // does nothing
     /// assert!(!inserted);
-    /// assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
+    /// assert_eq!(unsafe { x.as_ref() }, Some(&7.to_string()));
     /// ```
     ///
     /// A more advanced and useful example is demonstrated below:
@@ -48,7 +47,6 @@ impl<T> ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
     ///
     /// fn reader(maybe: &ConcurrentOption<String>) {
     ///     let mut is_none_at_least_once = false;
@@ -57,7 +55,7 @@ impl<T> ConcurrentOption<T> {
     ///     for _ in 0..100 {
     ///         std::thread::sleep(std::time::Duration::from_millis(100));
     ///
-    ///         let read = maybe.as_ref_with_order(Ordering::Acquire);
+    ///         let read = unsafe { maybe.as_ref() };
     ///
     ///         let is_none = read.is_none();
     ///         let is_seven = read == Some(&7.to_string());
@@ -102,7 +100,7 @@ impl<T> ConcurrentOption<T> {
     ///     }
     /// });
     ///
-    /// assert_eq!(maybe.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
+    /// assert_eq!(maybe.unwrap(), 7.to_string());
     /// ```
     pub fn initialize_if_none(&self, value: T) -> bool {
         match self.mut_handle(NONE, SOME) {
@@ -150,13 +148,13 @@ impl<T> ConcurrentOption<T> {
     ///
     /// let x = ConcurrentOption::<String>::none();
     /// unsafe { x.initialize_unchecked(3.to_string()) };
-    /// assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
+    /// assert_eq!(unsafe { x.as_ref() }, Some(&3.to_string()));
     ///
     /// #[cfg(not(miri))]
     /// {
     ///     let x = ConcurrentOption::some(7.to_string());
     ///     unsafe { x.initialize_unchecked(3.to_string()) }; // undefined behavior!
-    ///     assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
+    ///     assert_eq!(unsafe { x.as_ref() }, Some(&3.to_string()));
     /// }
     /// ```
     ///
@@ -179,7 +177,7 @@ impl<T> ConcurrentOption<T> {
     ///     for _ in 0..100 {
     ///         std::thread::sleep(std::time::Duration::from_millis(100));
     ///
-    ///         let read = maybe.as_ref_with_order(Ordering::Acquire);
+    ///         let read = unsafe { maybe.as_ref() };
     ///
     ///         let is_none = read.is_none();
     ///         let is_seven = read == Some(&7.to_string());
@@ -216,7 +214,7 @@ impl<T> ConcurrentOption<T> {
     ///     s.spawn(|| unsafe_initializer(maybe_ref));
     /// });
     ///
-    /// assert_eq!(maybe.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
+    /// assert_eq!(maybe.unwrap(), 7.to_string());
     /// ```
     pub unsafe fn initialize_unchecked(&self, value: T) {
         unsafe { &mut *self.value.get() }.write(value);
@@ -407,7 +405,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// Note that the insertion part of this method is thread safe.
     ///
-    /// The methods is `unsafe` due to the returned mutable reference to the underlying value.
+    /// The method is `unsafe` due to the returned mutable reference to the underlying value.
     ///
     /// * It is safe to use this method if the returned mutable reference is discarded (miri would still complain).
     /// * It is also safe to use this method if the caller is able to guarantee that there exist
@@ -423,7 +421,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// let val = unsafe { opt.insert(1) };
     /// assert_eq!(*val, 1);
-    /// assert_eq!(opt.as_ref(), Some(&1));
+    /// assert_eq!(unsafe { opt.as_ref() }, Some(&1));
     ///
     /// let val = unsafe { opt.insert(2) };
     /// assert_eq!(*val, 2);
@@ -479,7 +477,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// Note that the insertion part of this method is thread safe.
     ///
-    /// The methods is `unsafe` due to the returned mutable reference to the underlying value.
+    /// The method is `unsafe` due to the returned mutable reference to the underlying value.
     ///
     /// * It is safe to use this method if the returned mutable reference is discarded (miri would still complain).
     /// * It is also safe to use this method if the caller is able to guarantee that there exist
@@ -539,7 +537,7 @@ impl<T> ConcurrentOption<T> {
     where
         T: Clone,
     {
-        self.as_ref_with_order(order).cloned()
+        unsafe { self.as_ref_with_order(order) }.cloned()
     }
 
     /// Returns whether or not self is equal to the `other` with the desired `order`.
@@ -570,10 +568,9 @@ impl<T> ConcurrentOption<T> {
     where
         T: PartialEq,
     {
-        match (
-            self.as_ref_with_order(order),
-            other.as_ref_with_order(order),
-        ) {
+        match (unsafe { self.as_ref_with_order(order) }, unsafe {
+            other.as_ref_with_order(order)
+        }) {
             (None, None) => true,
             (Some(x), Some(y)) => x.eq(y),
             _ => false,
@@ -618,10 +615,9 @@ impl<T> ConcurrentOption<T> {
     {
         use std::cmp::Ordering::*;
 
-        match (
-            self.as_ref_with_order(order),
-            other.as_ref_with_order(order),
-        ) {
+        match (unsafe { self.as_ref_with_order(order) }, unsafe {
+            other.as_ref_with_order(order)
+        }) {
             (Some(l), Some(r)) => l.partial_cmp(r),
             (Some(_), None) => Some(Greater),
             (None, Some(_)) => Some(Less),
@@ -663,10 +659,9 @@ impl<T> ConcurrentOption<T> {
     {
         use std::cmp::Ordering::*;
 
-        match (
-            self.as_ref_with_order(order),
-            other.as_ref_with_order(order),
-        ) {
+        match (unsafe { self.as_ref_with_order(order) }, unsafe {
+            other.as_ref_with_order(order)
+        }) {
             (Some(l), Some(r)) => l.cmp(r),
             (Some(_), None) => Greater,
             (None, Some(_)) => Less,

@@ -62,7 +62,7 @@ fn concurrent_initialize_if_none_multiple_writer(
 fn read(do_sleep: bool, maybe_ref: &ConcurrentOption<String>, read_order: Ordering) {
     for _ in 0..100 {
         sleep(do_sleep);
-        let read = maybe_ref.as_ref_with_order(read_order);
+        let read = unsafe { maybe_ref.as_ref_with_order(read_order) };
         let is_none = read.is_none();
         let is_seven = read == Some(&7.to_string());
         assert!(is_none || is_seven);

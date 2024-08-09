@@ -1,4 +1,4 @@
-use crate::{concurrent_option::ConcurrentOption, states::ORDER_LOAD};
+use crate::concurrent_option::ConcurrentOption;
 
 impl<T: PartialEq> PartialEq for ConcurrentOption<T> {
     /// Returns whether or not self is equal to the `other` with the default ordering.
@@ -23,7 +23,12 @@ impl<T: PartialEq> PartialEq for ConcurrentOption<T> {
     /// assert!(z.eq(&z));
     /// ```
     fn eq(&self, other: &Self) -> bool {
-        self.eq_with_order(other, ORDER_LOAD)
+        match unsafe { (self.as_ref(), other.as_ref()) } {
+            (Some(l), Some(r)) => l.eq(r),
+            (Some(_), None) => false,
+            (None, Some(_)) => false,
+            (None, None) => true,
+        }
     }
 }
 

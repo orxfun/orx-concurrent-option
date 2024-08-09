@@ -90,33 +90,47 @@ impl<T> ConcurrentOption<T> {
         }
     }
 
-    /// Converts from `Option<T>` (or `&Option<T>`) to `Option<&T::Target>`.
+    /// Partially thread safe method to convert from `Option<T>` (or `&Option<T>`) to `Option<&T::Target>`.
     ///
     /// Leaves the original Option in-place, creating a new one with a reference
     /// to the original one, additionally coercing the contents via [`Deref`].
     ///
-    /// See [`as_deref_with_order`] to explicitly set the ordering.
+    /// # Safety
     ///
-    /// [`as_deref_with_order`]: ConcurrentOption::as_deref_with_order
+    /// Note that creating a valid reference part of this method is thread safe.
+    ///
+    /// The method is `unsafe` due to the returned reference to the underlying value.
+    ///
+    /// * It is safe to use this method if the returned reference is discarded (miri would still complain).
+    /// * It is also safe to use this method if the caller is able to guarantee that there exist
+    /// no concurrent writes while holding onto this reference.
+    ///   * One such case is using `as_ref` together with `initialize_when_none` method.
+    /// This is perfectly safe since the value will be written only once,
+    /// and `as_ref` returns a valid reference only after the value is initialized.
+    /// * Otherwise, it will lead to an **Undefined Behavior** due to data race.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
     ///
     /// let x: ConcurrentOption<String> = ConcurrentOption::some("hey".to_owned());
-    /// assert_eq!(x.as_deref(), Some("hey"));
+    /// assert_eq!(unsafe { x.as_deref() }, Some("hey"));
     ///
     /// let x: ConcurrentOption<String> = ConcurrentOption::none();
-    /// assert_eq!(x.as_deref(), None);
+    /// assert_eq!(unsafe { x.as_deref() }, None);
     /// ```
-    #[inline]
-    pub fn as_deref(&self) -> Option<&<T as Deref>::Target>
+    pub unsafe fn as_deref(&self) -> Option<&<T as Deref>::Target>
     where
         T: Deref,
     {
-        self.as_deref_with_order(ORDER_LOAD)
+        match self.mut_handle(SOME, SOME) {
+            Some(_handle) => {
+                let x = &*self.value.get();
+                Some(x.assume_init_ref())
+            }
+            None => None,
+        }
     }
 
     /// Returns an iterator over the possibly contained value; yields

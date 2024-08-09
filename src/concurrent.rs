@@ -311,10 +311,10 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(x, ConcurrentOption::none());
     /// assert_eq!(prev, Some(43));
     /// ```
+    #[allow(clippy::missing_panics_doc, clippy::unwrap_in_result)]
     pub fn take_if<P>(&self, predicate: P) -> Option<T>
     where
         P: FnOnce(&mut T) -> bool,
-        T: std::fmt::Debug,
     {
         loop {
             match self
@@ -418,6 +418,7 @@ impl<T> ConcurrentOption<T> {
     /// *val = 3;
     /// assert_eq!(opt.unwrap(), 3);
     /// ```
+    #[allow(clippy::mut_from_ref)]
     pub unsafe fn insert(&self, value: T) -> &mut T {
         loop {
             if let Some(_handle) = self.spin_get_handle(SOME, SOME) {
@@ -440,6 +441,17 @@ impl<T> ConcurrentOption<T> {
     /// See also [`ConcurrentOption::insert`], which updates the value even if
     /// the option already contains Some.
     ///
+    /// # Safety
+    ///
+    /// Note that the insertion part of this method is thread safe.
+    ///
+    /// The method is `unsafe` due to the returned mutable reference to the underlying value.
+    ///
+    /// * It is safe to use this method if the returned mutable reference is discarded (miri would still complain).
+    /// * It is also safe to use this method if the caller is able to guarantee that there exist
+    /// no concurrent reads or writes while mutating the value.
+    /// * Otherwise, it will lead to an **Undefined Behavior** due to data race.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -456,6 +468,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// assert_eq!(x, ConcurrentOption::some(7));
     /// ```
+    #[allow(clippy::mut_from_ref)]
     pub unsafe fn get_or_insert(&self, value: T) -> &mut T {
         self.get_or_insert_with(|| value)
     }
@@ -490,6 +503,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// assert_eq!(x, ConcurrentOption::some(7));
     /// ```
+    #[allow(clippy::mut_from_ref)]
     pub unsafe fn get_or_insert_with<F>(&self, f: F) -> &mut T
     where
         F: FnOnce() -> T,

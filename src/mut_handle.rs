@@ -12,12 +12,10 @@ impl<'a> MutHandle<'a> {
             .compare_exchange(initial_state, RESERVED, ORDER_LOAD, ORDER_LOAD)
             .is_ok()
         {
-            true => {
-                return Some(Self {
-                    state,
-                    success_state,
-                })
-            }
+            true => Some(Self {
+                state,
+                success_state,
+            }),
             false => None,
         }
     }

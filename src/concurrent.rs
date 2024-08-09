@@ -280,12 +280,12 @@ impl<T> ConcurrentOption<T> {
     /// ```rust
     /// use orx_concurrent_option::*;
     ///
-    /// let mut x = ConcurrentOption::some(42);
+    /// let x = ConcurrentOption::some(42);
     /// let y = x.take();
     /// assert_eq!(x, ConcurrentOption::none());
     /// assert_eq!(y, Some(42));
     ///
-    /// let mut x: ConcurrentOption<u32> = ConcurrentOption::none();
+    /// let x: ConcurrentOption<u32> = ConcurrentOption::none();
     /// let y = x.take();
     /// assert_eq!(x, ConcurrentOption::none());
     /// assert_eq!(y, None);
@@ -297,6 +297,66 @@ impl<T> ConcurrentOption<T> {
                 Some(unsafe { std::mem::MaybeUninit::assume_init_read(x) })
             }
             None => None,
+        }
+    }
+
+    /// Thread safe method to take the value out of the option, but only if the predicate evaluates to
+    /// `true` on a mutable reference to the value.
+    ///
+    /// In other words, replaces `self` with None if the predicate returns `true`.
+    /// This method operates similar to [`ConcurrentOption::take`] but conditional.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use orx_concurrent_option::*;
+    ///
+    /// let x = ConcurrentOption::some(42);
+    ///
+    /// let prev = x.take_if(|v| if *v == 42 {
+    ///     *v += 1;
+    ///     false
+    /// } else {
+    ///     false
+    /// });
+    /// assert_eq!(x, ConcurrentOption::some(43));
+    /// assert_eq!(prev, None);
+    ///
+    /// let prev = x.take_if(|v| *v == 43);
+    /// assert_eq!(x, ConcurrentOption::none());
+    /// assert_eq!(prev, Some(43));
+    /// ```
+    pub fn take_if<P>(&self, predicate: P) -> Option<T>
+    where
+        P: FnOnce(&mut T) -> bool,
+        T: std::fmt::Debug,
+    {
+        match self
+            .state
+            .compare_exchange(SOME, RESERVED, ORDER_LOAD, ORDER_LOAD)
+            .is_ok()
+        {
+            true => {
+                let x = unsafe { &mut *self.value.get() };
+                let x_mut = unsafe { std::mem::MaybeUninit::assume_init_mut(x) };
+                let output = match predicate(x_mut) {
+                    false => None,
+                    true => Some(unsafe { std::mem::MaybeUninit::assume_init_read(x) }),
+                };
+
+                let success_state = match output.is_some() {
+                    true => NONE,
+                    false => SOME,
+                };
+                self.state
+                    .compare_exchange(RESERVED, success_state, ORDER_STORE, ORDER_STORE)
+                    .expect(
+                        "Failed to update the concurrent state after concurrent state mutation",
+                    );
+
+                output
+            }
+            false => None,
         }
     }
 

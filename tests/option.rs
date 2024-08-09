@@ -71,6 +71,18 @@ fn as_deref_with_order() {
 // &mut self
 
 #[test]
+fn take() {
+    let x = ConcurrentOption::some(3.to_string());
+    let y = x.take();
+    assert!(x.is_none_with_order(Ordering::Relaxed));
+    assert_eq!(y, Some(3.to_string()));
+
+    let y = x.take();
+    assert!(x.is_none_with_order(Ordering::Relaxed));
+    assert_eq!(y, None);
+}
+
+#[test]
 fn exclusive_take() {
     let mut x = ConcurrentOption::some(3.to_string());
     let y = x.exclusive_take();
@@ -80,6 +92,26 @@ fn exclusive_take() {
     let y = x.exclusive_take();
     assert!(x.is_none_with_order(Ordering::Relaxed));
     assert_eq!(y, None);
+}
+
+#[test]
+fn take_if() {
+    let x = ConcurrentOption::some(42);
+
+    let prev = x.take_if(|v| {
+        if *v == 42 {
+            *v += 1;
+            false
+        } else {
+            false
+        }
+    });
+    assert_eq!(x, ConcurrentOption::some(43));
+    assert_eq!(prev, None);
+
+    let prev = x.take_if(|v| *v == 43);
+    assert_eq!(x, ConcurrentOption::<i32>::none());
+    assert_eq!(prev, Some(43));
 }
 
 #[test]

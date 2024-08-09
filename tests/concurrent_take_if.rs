@@ -6,7 +6,7 @@ use test_case::test_matrix;
     [2, 4, 8, 16],
     [false, true]
 )]
-fn concurrent_take_single_writer(num_readers: usize, do_sleep: bool) {
+fn concurrent_take_if_single_writer(num_readers: usize, do_sleep: bool) {
     let maybe = ConcurrentOption::some(7.to_string());
     let maybe_ref = &maybe;
 
@@ -28,7 +28,7 @@ fn concurrent_take_single_writer(num_readers: usize, do_sleep: bool) {
     [2, 4, 8, 16],
     [false, true]
 )]
-fn concurrent_take_multiple_writer(num_writers: usize, num_readers: usize, do_sleep: bool) {
+fn concurrent_take_if_multiple_writer(num_writers: usize, num_readers: usize, do_sleep: bool) {
     let maybe = ConcurrentOption::some(7.to_string());
     let maybe_ref = &maybe;
 
@@ -59,8 +59,14 @@ fn reader(do_sleep: bool, maybe: &ConcurrentOption<String>) {
 fn taker(do_sleep: bool, maybe: &ConcurrentOption<String>) {
     for i in 0..100 {
         sleep(do_sleep);
-        if i == 50 {
-            let _ = maybe.take();
+        match i {
+            50 => {
+                let _ = maybe.take_if(|x| x == &7.to_string());
+            }
+            _ => {
+                let taken = maybe.take_if(|x| x == &1_000_000.to_string());
+                assert!(taken.is_none());
+            }
         }
     }
 }

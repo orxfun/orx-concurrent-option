@@ -1,5 +1,4 @@
 use orx_concurrent_option::*;
-use std::sync::atomic::Ordering;
 
 #[test]
 fn iter_mut_when_none() {
@@ -27,13 +26,13 @@ fn iter_mut_when_some() {
 
     let mut x = ConcurrentOption::some(3.to_string());
     validate(x.exclusive_iter_mut());
-    assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
+    assert_eq!(unsafe { x.as_ref() }, Some(&7.to_string()));
 
     let mut x = ConcurrentOption::some(3.to_string());
     validate(x.exclusive_iter_mut().rev());
-    assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
+    assert_eq!(unsafe { x.as_ref() }, Some(&7.to_string()));
 
     let mut x = ConcurrentOption::some(3.to_string());
     validate((&mut x).into_iter());
-    assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
+    assert_eq!(unsafe { x.as_ref() }, Some(&7.to_string()));
 }

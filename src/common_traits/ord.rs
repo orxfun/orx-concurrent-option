@@ -1,4 +1,4 @@
-use crate::{states::ORDER_LOAD, ConcurrentOption};
+use crate::ConcurrentOption;
 use std::cmp::Ordering::*;
 
 impl<T: PartialOrd> PartialOrd for ConcurrentOption<T> {
@@ -29,10 +29,7 @@ impl<T: PartialOrd> PartialOrd for ConcurrentOption<T> {
     /// assert_eq!(z.partial_cmp(&z), Some(Equal));
     /// ```
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match (
-            self.as_ref_with_order(ORDER_LOAD),
-            other.as_ref_with_order(ORDER_LOAD),
-        ) {
+        match unsafe { (self.as_ref(), other.as_ref()) } {
             (Some(l), Some(r)) => l.partial_cmp(r),
             (Some(_), None) => Some(Greater),
             (None, Some(_)) => Some(Less),
@@ -69,10 +66,7 @@ impl<T: Ord> Ord for ConcurrentOption<T> {
     /// assert_eq!(z.cmp(&z), Equal);
     /// ```
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match (
-            self.as_ref_with_order(ORDER_LOAD),
-            other.as_ref_with_order(ORDER_LOAD),
-        ) {
+        match unsafe { (self.as_ref(), other.as_ref()) } {
             (Some(l), Some(r)) => l.cmp(r),
             (Some(_), None) => Greater,
             (None, Some(_)) => Less,

@@ -2,7 +2,7 @@ use crate::{states::*, ConcurrentOption};
 use std::sync::atomic::Ordering;
 
 impl<T> ConcurrentOption<T> {
-    // row
+    // raw
 
     /// Returns:
     /// * a raw `*const T` pointer to the underlying data when the option is of Some variant;
@@ -62,7 +62,7 @@ impl<T> ConcurrentOption<T> {
     /// let p = x.raw_get_mut();
     /// let p = p.unwrap();
     /// let _ = unsafe { p.replace(7.to_string()) }; // only write leads to memory leak
-    /// assert_eq!(x.as_ref(), Some(&7.to_string()));
+    /// assert_eq!(unsafe { x.as_ref() }, Some(&7.to_string()));
     /// ```
     pub fn raw_get_mut(&self) -> Option<*mut T> {
         match self.mut_handle(SOME, SOME) {
@@ -74,7 +74,7 @@ impl<T> ConcurrentOption<T> {
         }
     }
 
-    // row with-order
+    // raw with-order
 
     /// Returns:
     /// * a raw `*const T` pointer to the underlying data when the option is of Some variant;
@@ -132,7 +132,7 @@ impl<T> ConcurrentOption<T> {
     /// let p = x.raw_get_mut_with_order(Ordering::Relaxed);
     /// let p = p.unwrap();
     /// let _ = unsafe { p.replace(7.to_string()) }; // only write leads to memory leak
-    /// assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
+    /// assert_eq!(unsafe { x.as_ref() }, Some(&7.to_string()));
     /// ```
     pub fn raw_get_mut_with_order(&self, order: Ordering) -> Option<*mut T> {
         match self.state.load(order) {

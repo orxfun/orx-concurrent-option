@@ -9,10 +9,9 @@ impl<T> From<T> for ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
     ///
     /// let x: ConcurrentOption<String> = 3.to_string().into();
-    /// assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
+    /// assert_eq!(unsafe { x.as_ref() }, Some(&3.to_string()));
     /// ```
     fn from(value: T) -> Self {
         ConcurrentOption::some(value)
@@ -26,13 +25,12 @@ impl<T> From<Option<T>> for ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
     ///
     /// let x: ConcurrentOption<String> = Some(3.to_string()).into();
-    /// assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
+    /// assert_eq!(unsafe { x.as_ref() }, Some(&3.to_string()));
     ///
     /// let x: ConcurrentOption<String> = None.into();
-    /// assert_eq!(x.as_ref_with_order(Ordering::Relaxed), None);
+    /// assert_eq!(unsafe { x.as_ref() }, None);
     /// ```
     fn from(value: Option<T>) -> Self {
         match value {
@@ -51,7 +49,6 @@ impl<T> From<ConcurrentOption<T>> for Option<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
     ///
     /// let x = ConcurrentOption::some(3.to_string());
     /// let y: Option<_> = x.into();

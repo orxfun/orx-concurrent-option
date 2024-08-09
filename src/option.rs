@@ -10,6 +10,135 @@ impl<T> ConcurrentOption<T> {
 
     /// Returns `true` if the option is a Some variant.
     ///
+    /// See [`is_some_with_order`] to explicitly set the ordering.
+    ///
+    /// [`is_some_with_order`]: ConcurrentOption::is_some_with_order
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use orx_concurrent_option::*;
+    /// use std::sync::atomic::Ordering;
+    ///
+    /// let x: ConcurrentOption<u32> = ConcurrentOption::some(2);
+    /// assert_eq!(x.is_some(), true);
+    ///
+    /// let x: ConcurrentOption<u32> = ConcurrentOption::none();
+    /// assert_eq!(x.is_some(), false);
+    /// ```
+    #[inline]
+    pub fn is_some(&self) -> bool {
+        self.is_some_with_order(ORDER_LOAD)
+    }
+
+    /// Returns `true` if the option is a None variant.
+    ///
+    /// See [`is_none_with_order`] to explicitly set the ordering.
+    ///
+    /// [`is_none_with_order`]: ConcurrentOption::is_none_with_order
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use orx_concurrent_option::*;
+    ///
+    /// let x: ConcurrentOption<u32> = ConcurrentOption::some(2);
+    /// assert_eq!(x.is_none(), false);
+    ///
+    /// let x: ConcurrentOption<u32> = ConcurrentOption::none();
+    /// assert_eq!(x.is_none(), true);
+    /// ```
+    #[inline]
+    pub fn is_none(&self) -> bool {
+        self.is_none_with_order(ORDER_LOAD)
+    }
+
+    /// Converts from `&Option<T>` to `Option<&T>`.
+    ///
+    /// See [`as_ref_with_order`] to explicitly set the ordering.
+    ///
+    /// [`as_ref_with_order`]: ConcurrentOption::as_ref_with_order
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use orx_concurrent_option::*;
+    /// use std::sync::atomic::Ordering;
+    ///
+    /// let x = ConcurrentOption::some(3.to_string());
+    /// assert_eq!(x.as_ref(), Some(&3.to_string()));
+    ///
+    /// _ = x.take();
+    /// assert_eq!(x.as_ref(), None);
+    /// ```
+    #[inline]
+    pub fn as_ref(&self) -> Option<&T> {
+        self.as_ref_with_order(ORDER_LOAD)
+    }
+
+    /// Converts from `Option<T>` (or `&Option<T>`) to `Option<&T::Target>`.
+    ///
+    /// Leaves the original Option in-place, creating a new one with a reference
+    /// to the original one, additionally coercing the contents via [`Deref`].
+    ///
+    /// See [`as_deref_with_order`] to explicitly set the ordering.
+    ///
+    /// [`as_deref_with_order`]: ConcurrentOption::as_deref_with_order
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use orx_concurrent_option::*;
+    /// use std::sync::atomic::Ordering;
+    ///
+    /// let x: ConcurrentOption<String> = ConcurrentOption::some("hey".to_owned());
+    /// assert_eq!(x.as_deref(), Some("hey"));
+    ///
+    /// let x: ConcurrentOption<String> = ConcurrentOption::none();
+    /// assert_eq!(x.as_deref(), None);
+    /// ```
+    #[inline]
+    pub fn as_deref(&self) -> Option<&<T as Deref>::Target>
+    where
+        T: Deref,
+    {
+        self.as_deref_with_order(ORDER_LOAD)
+    }
+
+    /// Returns an iterator over the possibly contained value; yields
+    /// * the single element if the option is of Some variant;
+    /// * no elements otherwise.
+    ///
+    /// See [`iter_with_order`] to explicitly set the ordering.
+    ///
+    /// [`iter_with_order`]: ConcurrentOption::iter_with_order
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use orx_concurrent_option::*;
+    /// use std::sync::atomic::Ordering;
+    ///
+    /// fn validate<'a>(mut iter: impl ExactSizeIterator<Item = &'a String>) {
+    ///     assert_eq!(iter.len(), 0);
+    ///     assert!(iter.next().is_none());
+    ///     assert!(iter.next().is_none());
+    /// }
+    ///
+    /// let x = ConcurrentOption::<String>::none();
+    /// validate(x.iter());
+    /// validate(x.iter().rev());
+    /// validate((&x).into_iter());
+    /// ```
+    #[inline]
+    pub fn iter(&self) -> crate::iter::Iter<'_, T> {
+        self.iter_with_order(ORDER_LOAD)
+    }
+
+    // &self - with-order
+
+    /// Returns `true` if the option is a Some variant.
+    ///
     /// Depending on requirement of the use case, `Relaxed`, `Acquire` or `SeqCst` can be used as the `order`.
     ///
     /// # Examples
@@ -416,7 +545,7 @@ impl<T> ConcurrentOption<T> {
     /// # Panics
     ///
     /// Panics if the value is a None with a custom panic message provided by
-    /// `msg`.
+    /// `message`.
     ///
     /// # Examples
     ///
@@ -433,8 +562,8 @@ impl<T> ConcurrentOption<T> {
     /// let x: ConcurrentOption<&str> = ConcurrentOption::none();
     /// x.expect("fruits are healthy"); // panics with `fruits are healthy`
     /// ```
-    pub fn expect(mut self, msg: &str) -> T {
-        self.exclusive_take().expect(msg)
+    pub fn expect(mut self, message: &str) -> T {
+        self.exclusive_take().expect(message)
     }
 
     /// Returns the contained Some value, consuming the `self` value.

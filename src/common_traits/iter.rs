@@ -1,5 +1,5 @@
-use crate::ConcurrentOption;
-use std::{iter::FusedIterator, sync::atomic::Ordering};
+use crate::{states::ORDER_LOAD, ConcurrentOption};
+use std::iter::FusedIterator;
 
 // INTO-ITER
 
@@ -8,7 +8,7 @@ impl<'a, T> IntoIterator for &'a ConcurrentOption<T> {
     type IntoIter = Iter<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.iter_with_order(Ordering::Relaxed)
+        self.iter_with_order(ORDER_LOAD)
     }
 }
 

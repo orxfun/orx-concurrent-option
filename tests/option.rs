@@ -4,6 +4,53 @@ use std::sync::atomic::Ordering;
 // &self
 
 #[test]
+fn is_some() {
+    let mut x = ConcurrentOption::some(3.to_string());
+    assert_eq!(x.is_some(), true);
+
+    _ = x.exclusive_take();
+    assert_eq!(x.is_some(), false);
+}
+
+#[test]
+fn is_none() {
+    let mut x = ConcurrentOption::some(3.to_string());
+    assert_eq!(x.is_none(), false);
+
+    _ = x.exclusive_take();
+    assert_eq!(x.is_none(), true);
+}
+
+#[test]
+fn as_ref() {
+    let mut x = ConcurrentOption::some(3.to_string());
+    assert_eq!(x.as_ref(), Some(&3.to_string()));
+
+    _ = x.exclusive_take();
+    assert_eq!(x.as_ref(), None);
+}
+
+#[test]
+fn as_deref() {
+    let mut x = ConcurrentOption::some(3.to_string());
+    assert_eq!(x.as_deref(), Some("3"));
+
+    _ = x.exclusive_take();
+    assert_eq!(x.as_deref(), None);
+}
+
+// &self - with-order
+
+#[test]
+fn is_none_with_order() {
+    let mut x = ConcurrentOption::some(3.to_string());
+    assert_eq!(x.is_none_with_order(Ordering::Relaxed), false);
+
+    _ = x.exclusive_take();
+    assert_eq!(x.is_none_with_order(Ordering::Relaxed), true);
+}
+
+#[test]
 fn as_ref_with_order() {
     let mut x = ConcurrentOption::some(3.to_string());
     assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
@@ -13,7 +60,7 @@ fn as_ref_with_order() {
 }
 
 #[test]
-fn as_deref() {
+fn as_deref_with_order() {
     let mut x = ConcurrentOption::some(3.to_string());
     assert_eq!(x.as_deref_with_order(Ordering::Relaxed), Some("3"));
 

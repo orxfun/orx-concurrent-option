@@ -1,13 +1,11 @@
-use crate::ConcurrentOption;
+use crate::{states::ORDER_LOAD, ConcurrentOption};
 use std::cmp::Ordering::*;
 
 impl<T: PartialOrd> PartialOrd for ConcurrentOption<T> {
-    /// Returns an ordering between `self` and `other` with the [`Relaxed`] ordering.
+    /// Returns an ordering between `self` and `other` with the default ordering.
     ///
-    /// In order to compare with a stronger ordering,
-    /// you may call [`partial_cmp_with_order`] with the desired ordering.
+    /// You may call [`partial_cmp_with_order`] to use the desired ordering.
     ///
-    /// [`Relaxed`]: std::sync::atomic::Ordering::Relaxed
     /// [`partial_cmp_with_order`]: ConcurrentOption::partial_cmp_with_order
     ///
     /// ```rust
@@ -32,8 +30,8 @@ impl<T: PartialOrd> PartialOrd for ConcurrentOption<T> {
     /// ```
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match (
-            self.as_ref_with_order(std::sync::atomic::Ordering::Relaxed),
-            other.as_ref_with_order(std::sync::atomic::Ordering::Relaxed),
+            self.as_ref_with_order(ORDER_LOAD),
+            other.as_ref_with_order(ORDER_LOAD),
         ) {
             (Some(l), Some(r)) => l.partial_cmp(r),
             (Some(_), None) => Some(Greater),
@@ -44,12 +42,10 @@ impl<T: PartialOrd> PartialOrd for ConcurrentOption<T> {
 }
 
 impl<T: Ord> Ord for ConcurrentOption<T> {
-    /// Returns an ordering between `self` and `other` with the [`Relaxed`] ordering.
+    /// Returns an ordering between `self` and `other` with the default ordering.
     ///
-    /// In order to compare with a stronger ordering,
-    /// you may call [`cmp_with_order`] with the desired ordering.
+    /// You may call [`cmp_with_order`] to use the desired ordering.
     ///
-    /// [`Relaxed`]: std::sync::atomic::Ordering::Relaxed
     /// [`cmp_with_order`]: ConcurrentOption::cmp_with_order
     ///
     /// ```rust
@@ -74,8 +70,8 @@ impl<T: Ord> Ord for ConcurrentOption<T> {
     /// ```
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match (
-            self.as_ref_with_order(std::sync::atomic::Ordering::Relaxed),
-            other.as_ref_with_order(std::sync::atomic::Ordering::Relaxed),
+            self.as_ref_with_order(ORDER_LOAD),
+            other.as_ref_with_order(ORDER_LOAD),
         ) {
             (Some(l), Some(r)) => l.cmp(r),
             (Some(_), None) => Greater,

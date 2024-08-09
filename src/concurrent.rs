@@ -333,11 +333,9 @@ impl<T> ConcurrentOption<T> {
 
     /// Clones the concurrent option with the desired `order` into an Option.
     ///
-    /// Note that the `Clone` trait implementation clones the concurrent option with the [`Relaxed`] ordering.
+    /// Note that the `Clone` trait implementation clones the concurrent option with the default ordering.
     ///
-    /// [`Relaxed`]: std::sync::atomic::Ordering::Relaxed
-    ///
-    /// You may use `clone_with_order` in order to clone with a stronger ordering.
+    /// You may use `clone_with_order` in order to clone with the desired ordering.
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
@@ -356,11 +354,9 @@ impl<T> ConcurrentOption<T> {
 
     /// Returns whether or not self is equal to the `other` with the desired `order`.
     ///
-    /// Note that the `PartialEq` trait implementation checks equality with the [`Relaxed`] ordering.
+    /// Note that the `PartialEq` trait implementation checks equality with the default ordering.
     ///
-    /// [`Relaxed`]: std::sync::atomic::Ordering::Relaxed
-    ///
-    /// You may use `eq_with_order` in order to check equality with a stronger ordering.
+    /// You may use `eq_with_order` in order to check equality with the desired ordering.
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
@@ -396,11 +392,9 @@ impl<T> ConcurrentOption<T> {
 
     /// Returns an ordering between `self` and `other` with the desired `order`.
     ///
-    /// Note that the `PartialOrd` trait implementation checks equality with the [`Relaxed`] ordering.
+    /// Note that the `PartialOrd` trait implementation checks equality with the default ordering.
     ///
-    /// [`Relaxed`]: std::sync::atomic::Ordering::Relaxed
-    ///
-    /// You may use `partial_cmp_with_order` in order to check equality with a stronger ordering.
+    /// You may use `partial_cmp_with_order` in order to check equality with the desired ordering.
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
@@ -447,11 +441,9 @@ impl<T> ConcurrentOption<T> {
 
     /// Returns an ordering between `self` and `other` with the desired `order`.
     ///
-    /// Note that the `Ord` trait implementation checks equality with the [`Relaxed`] ordering.
+    /// Note that the `Ord` trait implementation checks equality with the default ordering.
     ///
-    /// [`Relaxed`]: std::sync::atomic::Ordering::Relaxed
-    ///
-    /// You may use `cmp_with_order` in order to check equality with a stronger ordering.
+    /// You may use `cmp_with_order` in order to check equality with the desired ordering.
     ///
     /// ```rust
     /// use orx_concurrent_option::*;

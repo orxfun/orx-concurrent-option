@@ -24,7 +24,7 @@ impl<T> ConcurrentOption<T> {
     /// ```
     #[inline]
     pub fn is_some(&self) -> bool {
-        self.is_some_with_order(ORDER_LOAD)
+        self.state.load(ORDER_LOAD) == SOME
     }
 
     /// Returns `true` if the option is a None variant.
@@ -46,7 +46,7 @@ impl<T> ConcurrentOption<T> {
     /// ```
     #[inline]
     pub fn is_none(&self) -> bool {
-        self.is_none_with_order(ORDER_LOAD)
+        self.state.load(ORDER_LOAD) != SOME
     }
 
     /// Partially thread safe method to convert from `&Option<T>` to `Option<&T>`.

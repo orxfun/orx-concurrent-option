@@ -42,12 +42,12 @@ fn as_deref() {
 // &self - with-order
 
 #[test]
-fn is_none_with_order() {
+fn state() {
     let mut x = ConcurrentOption::some(3.to_string());
-    assert_eq!(x.is_none_with_order(Ordering::Relaxed), false);
+    assert_eq!(x.state(Ordering::Relaxed), State::Some);
 
     _ = x.exclusive_take();
-    assert_eq!(x.is_none_with_order(Ordering::Relaxed), true);
+    assert_eq!(x.state(Ordering::Relaxed), State::None);
 }
 
 #[test]
@@ -64,11 +64,13 @@ fn as_ref_with_order() {
 
 #[test]
 fn as_deref_with_order() {
-    let mut x = ConcurrentOption::some(3.to_string());
-    assert_eq!(x.as_deref_with_order(Ordering::Relaxed), Some("3"));
+    unsafe {
+        let mut x = ConcurrentOption::some(3.to_string());
+        assert_eq!(x.as_deref_with_order(Ordering::Relaxed), Some("3"));
 
-    _ = x.exclusive_take();
-    assert_eq!(x.as_deref_with_order(Ordering::Relaxed), None);
+        _ = x.exclusive_take();
+        assert_eq!(x.as_deref_with_order(Ordering::Relaxed), None);
+    }
 }
 
 // &mut self
@@ -77,11 +79,11 @@ fn as_deref_with_order() {
 fn take() {
     let x = ConcurrentOption::some(3.to_string());
     let y = x.take();
-    assert!(x.is_none_with_order(Ordering::Relaxed));
+    assert!(x.is_none());
     assert_eq!(y, Some(3.to_string()));
 
     let y = x.take();
-    assert!(x.is_none_with_order(Ordering::Relaxed));
+    assert!(x.is_none());
     assert_eq!(y, None);
 }
 
@@ -89,11 +91,11 @@ fn take() {
 fn exclusive_take() {
     let mut x = ConcurrentOption::some(3.to_string());
     let y = x.exclusive_take();
-    assert!(x.is_none_with_order(Ordering::Relaxed));
+    assert!(x.is_none());
     assert_eq!(y, Some(3.to_string()));
 
     let y = x.exclusive_take();
-    assert!(x.is_none_with_order(Ordering::Relaxed));
+    assert!(x.is_none());
     assert_eq!(y, None);
 }
 
@@ -144,7 +146,9 @@ fn exclusive_as_mut() {
         x.make_ascii_uppercase();
         x
     });
-    assert_eq!(x.as_deref_with_order(Ordering::Relaxed), Some("ABC"));
+    unsafe {
+        assert_eq!(x.as_deref_with_order(Ordering::Relaxed), Some("ABC"));
+    }
 
     _ = x.exclusive_take();
     assert!(x.exclusive_as_mut().is_none());
@@ -157,7 +161,9 @@ fn exclusive_as_deref_mut() {
         x.make_ascii_uppercase();
         x
     });
-    assert_eq!(x.as_deref_with_order(Ordering::Relaxed), Some("ABC"));
+    unsafe {
+        assert_eq!(x.as_deref_with_order(Ordering::Relaxed), Some("ABC"));
+    }
 
     _ = x.exclusive_take();
     assert!(x.exclusive_as_deref_mut().is_none());

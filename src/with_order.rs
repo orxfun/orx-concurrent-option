@@ -2,9 +2,7 @@ use crate::{states::*, ConcurrentOption};
 use std::{ops::Deref, sync::atomic::Ordering};
 
 impl<T> ConcurrentOption<T> {
-    /// Returns `true` if the option is a Some variant.
-    ///
-    /// Depending on requirement of the use case, `Relaxed`, `Acquire` or `SeqCst` can be used as the `order`.
+    /// Loads and returns the concurrent state of the option with the given `order`.
     ///
     /// # Examples
     ///
@@ -13,33 +11,13 @@ impl<T> ConcurrentOption<T> {
     /// use std::sync::atomic::Ordering;
     ///
     /// let x: ConcurrentOption<u32> = ConcurrentOption::some(2);
-    /// assert_eq!(x.is_some_with_order(Ordering::Relaxed), true);
+    /// assert_eq!(x.state(Ordering::Relaxed), State::Some);
     ///
     /// let x: ConcurrentOption<u32> = ConcurrentOption::none();
-    /// assert_eq!(x.is_some_with_order(Ordering::SeqCst), false);
+    /// assert_eq!(x.state(Ordering::SeqCst), State::None);
     /// ```
-    pub fn is_some_with_order(&self, order: Ordering) -> bool {
-        self.state.load(order) == SOME
-    }
-
-    /// Returns `true` if the option is a None variant.
-    ///
-    /// Depending on requirement of the use case, `Relaxed`, `Acquire` or `SeqCst` can be used as the `order`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
-    ///
-    /// let x: ConcurrentOption<u32> = ConcurrentOption::some(2);
-    /// assert_eq!(x.is_none_with_order(Ordering::Relaxed), false);
-    ///
-    /// let x: ConcurrentOption<u32> = ConcurrentOption::none();
-    /// assert_eq!(x.is_none_with_order(Ordering::SeqCst), true);
-    /// ```
-    pub fn is_none_with_order(&self, order: Ordering) -> bool {
-        self.state.load(order) != SOME
+    pub fn state(&self, order: Ordering) -> State {
+        State::new(self.state.load(order))
     }
 
     /// Converts from `&Option<T>` to `Option<&T>`.
@@ -81,13 +59,16 @@ impl<T> ConcurrentOption<T> {
     /// use orx_concurrent_option::*;
     /// use std::sync::atomic::Ordering;
     ///
-    /// let x: ConcurrentOption<String> = ConcurrentOption::some("hey".to_owned());
-    /// assert_eq!(x.as_deref_with_order(Ordering::Acquire), Some("hey"));
+    /// unsafe
+    /// {
+    ///     let x: ConcurrentOption<String> = ConcurrentOption::some("hey".to_owned());
+    ///     assert_eq!(x.as_deref_with_order(Ordering::Acquire), Some("hey"));
     ///
-    /// let x: ConcurrentOption<String> = ConcurrentOption::none();
-    /// assert_eq!(x.as_deref_with_order(Ordering::SeqCst), None);
+    ///     let x: ConcurrentOption<String> = ConcurrentOption::none();
+    ///     assert_eq!(x.as_deref_with_order(Ordering::SeqCst), None);
+    /// }
     /// ```
-    pub fn as_deref_with_order(&self, order: Ordering) -> Option<&<T as Deref>::Target>
+    pub unsafe fn as_deref_with_order(&self, order: Ordering) -> Option<&<T as Deref>::Target>
     where
         T: Deref,
     {
@@ -116,11 +97,14 @@ impl<T> ConcurrentOption<T> {
     /// }
     ///
     /// let x = ConcurrentOption::<String>::none();
+    /// unsafe
+    /// {
     /// validate(x.iter_with_order(Ordering::SeqCst));
-    /// validate(x.iter_with_order(Ordering::Relaxed).rev());
-    /// validate((&x).into_iter());
+    ///     validate(x.iter_with_order(Ordering::Relaxed).rev());
+    ///     validate((&x).into_iter());
+    /// }
     /// ```
-    pub fn iter_with_order(&self, order: Ordering) -> crate::iter::Iter<'_, T> {
+    pub unsafe fn iter_with_order(&self, order: Ordering) -> crate::iter::Iter<'_, T> {
         let maybe = unsafe { self.as_ref_with_order(order) };
         crate::iter::Iter { maybe }
     }

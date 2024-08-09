@@ -1,19 +1,18 @@
 use orx_concurrent_option::*;
-use std::sync::atomic::Ordering;
 
 #[test]
 fn clone() {
     let x = ConcurrentOption::some(3.to_string());
     let y = x.clone();
 
-    assert!(y.is_some_with_order(Ordering::Relaxed));
+    assert!(y.is_some());
     assert_eq!(unsafe { y.as_ref() }, Some(&3.to_string()));
     assert_eq!(x, y);
 
     let x = ConcurrentOption::<String>::none();
     let y = x.clone();
 
-    assert!(y.is_none_with_order(Ordering::Relaxed));
+    assert!(y.is_none());
     assert_eq!(unsafe { y.as_ref() }, None);
     assert_eq!(x, y);
 }

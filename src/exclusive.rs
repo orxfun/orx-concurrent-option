@@ -68,13 +68,13 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(y, None);
     /// ```
     pub fn exclusive_take(&mut self) -> Option<T> {
-        match self.is_some_with_order(Ordering::Relaxed) {
-            false => None,
-            true => {
+        match self.state(Ordering::Relaxed) {
+            State::Some => {
                 self.state.store(NONE, Ordering::Relaxed);
                 let x = unsafe { &mut *self.value.get() };
                 Some(unsafe { x.assume_init_read() })
             }
+            _ => None,
         }
     }
 

@@ -356,13 +356,13 @@ fn flatten() {
 #[test]
 fn is_some_and() {
     let x = ConcurrentOption::some(2);
-    assert_eq!(x.is_some_and(|x| x > 1), true);
+    assert_eq!(x.is_some_and(|x| *x > 1), true);
 
     let x = ConcurrentOption::some(0);
-    assert_eq!(x.is_some_and(|x| x > 1), false);
+    assert_eq!(x.is_some_and(|x| *x > 1), false);
 
     let x: ConcurrentOption<u32> = ConcurrentOption::none();
-    assert_eq!(x.is_some_and(|x| x > 1), false);
+    assert_eq!(x.is_some_and(|x| *x > 1), false);
 }
 
 #[test]

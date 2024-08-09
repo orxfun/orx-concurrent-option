@@ -324,11 +324,13 @@ fn filter() {
     }
 
     let x = ConcurrentOption::<_>::none();
-    assert_eq!(x.filter(is_even), None);
+    unsafe {
+        assert_eq!(x.filter(is_even), None);
 
-    assert_eq!(ConcurrentOption::some(3).filter(is_even), None);
+        assert_eq!(ConcurrentOption::some(3).filter(is_even), None);
 
-    assert_eq!(ConcurrentOption::some(4).filter(is_even), Some(4));
+        assert_eq!(ConcurrentOption::some(4).filter(is_even), Some(&4));
+    }
 }
 
 #[test]
@@ -397,63 +399,6 @@ fn map_or_else() {
 }
 
 #[test]
-fn ok_or() {
-    let x = ConcurrentOption::some("foo");
-    assert_eq!(x.ok_or(0), Ok("foo"));
-
-    let x = ConcurrentOption::<&str>::none();
-    assert_eq!(x.ok_or(0), Err(0));
-}
-
-#[test]
-fn ok_or_else() {
-    let x = ConcurrentOption::some("foo");
-    assert_eq!(x.ok_or_else(|| 0), Ok("foo"));
-
-    let x = ConcurrentOption::<&str>::none();
-    assert_eq!(x.ok_or_else(|| 0), Err(0));
-}
-
-#[test]
-fn or() {
-    let x = ConcurrentOption::some(2);
-    let y = ConcurrentOption::<u32>::none();
-    assert_eq!(x.or(y), Some(2));
-
-    let x = ConcurrentOption::<u32>::none();
-    let y = ConcurrentOption::some(100);
-    assert_eq!(x.or(y), Some(100));
-
-    let x = ConcurrentOption::some(2);
-    let y = ConcurrentOption::some(100);
-    assert_eq!(x.or(y), Some(2));
-
-    let x: Option<u32> = None;
-    let y = None;
-    assert_eq!(x.or(y), None);
-}
-
-#[test]
-fn or_else() {
-    fn nobody() -> Option<&'static str> {
-        None
-    }
-    fn vikings() -> ConcurrentOption<&'static str> {
-        ConcurrentOption::some("vikings")
-    }
-
-    assert_eq!(
-        ConcurrentOption::some("barbarians").or_else(vikings),
-        Some("barbarians")
-    );
-    assert_eq!(
-        ConcurrentOption::<&str>::none().or_else(vikings),
-        Some("vikings")
-    );
-    assert_eq!(ConcurrentOption::<&str>::none().or_else(nobody), None);
-}
-
-#[test]
 fn xor() {
     let mut opt = ConcurrentOption::<i32>::none();
     let val = opt.exclusive_insert(1);
@@ -463,24 +408,4 @@ fn xor() {
     assert_eq!(*val, 2);
     *val = 3;
     assert_eq!(opt.unwrap(), 3);
-}
-
-#[test]
-fn zip() {
-    let x = ConcurrentOption::some(1);
-    let y = Some("hi");
-    assert_eq!(x.zip(y), Some((1, "hi")));
-
-    let x = ConcurrentOption::some(1);
-    let z = ConcurrentOption::<u8>::none();
-    assert_eq!(x.zip(z), None);
-}
-
-#[test]
-fn unzip() {
-    let x = ConcurrentOption::some((1, "hi"));
-    let y = ConcurrentOption::<(u8, u32)>::none();
-
-    assert_eq!(x.unzip(), (Some(1), Some("hi")));
-    assert_eq!(y.unzip(), (None, None));
 }

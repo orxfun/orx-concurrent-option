@@ -26,12 +26,12 @@ fn initialize_unchecked() {
 }
 
 #[test]
-fn map_ref() {
+fn map() {
     let x = ConcurrentOption::<String>::none();
-    let len = x.map_ref(|x| x.len());
+    let len = x.map(|x| x.len());
     assert_eq!(len, None);
 
     let x = ConcurrentOption::some(7.to_string());
-    let len = x.map_ref(|x| x.len());
+    let len = x.map(|x| x.len());
     assert_eq!(len, Some(1));
 }

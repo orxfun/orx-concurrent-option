@@ -446,6 +446,79 @@ impl<T> ConcurrentOption<T> {
         }
     }
 
+    /// Inserts `value` into the option if it is None, then
+    /// returns a mutable reference to the contained value.
+    ///
+    /// See also [`ConcurrentOption::insert`], which updates the value even if
+    /// the option already contains Some.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use orx_concurrent_option::*;
+    ///
+    /// let x = ConcurrentOption::none();
+    ///
+    /// {
+    ///     let y: &mut u32 = unsafe { x.get_or_insert(5) };
+    ///     assert_eq!(y, &5);
+    ///
+    ///     *y = 7;
+    /// }
+    ///
+    /// assert_eq!(x, ConcurrentOption::some(7));
+    /// ```
+    pub unsafe fn get_or_insert(&self, value: T) -> &mut T {
+        self.get_or_insert_with(|| value)
+    }
+
+    /// Partially thread safe method to insert a value computed from `f` into the option if it is None,
+    /// then returns a mutable reference to the contained value.
+    ///
+    /// # Safety
+    ///
+    /// Note that the insertion part of this method is thread safe.
+    ///
+    /// The methods is `unsafe` due to the returned mutable reference to the underlying value.
+    ///
+    /// * It is safe to use this method if the returned mutable reference is discarded (miri would still complain).
+    /// * It is also safe to use this method if the caller is able to guarantee that there exist
+    /// no concurrent reads or writes while mutating the value.
+    /// * Otherwise, it will lead to an **Undefined Behavior** due to data race.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use orx_concurrent_option::*;
+    ///
+    /// let x = ConcurrentOption::none();
+    ///
+    /// {
+    ///     let y: &mut u32 = unsafe { x.get_or_insert_with(|| 5) };
+    ///     assert_eq!(y, &5);
+    ///
+    ///     *y = 7;
+    /// }
+    ///
+    /// assert_eq!(x, ConcurrentOption::some(7));
+    /// ```
+    pub unsafe fn get_or_insert_with<F>(&self, f: F) -> &mut T
+    where
+        F: FnOnce() -> T,
+    {
+        loop {
+            if let Some(_handle) = self.mut_handle(SOME, SOME) {
+                return unsafe { (*self.value.get()).assume_init_mut() };
+            }
+
+            if let Some(_handle) = self.mut_handle(NONE, SOME) {
+                let x = unsafe { &mut *self.value.get() };
+                x.write(f());
+                return unsafe { x.assume_init_mut() };
+            }
+        }
+    }
+
     // common traits
 
     /// Clones the concurrent option with the desired `order` into an Option.

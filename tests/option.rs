@@ -33,10 +33,10 @@ fn as_ref() {
 #[test]
 fn as_deref() {
     let mut x = ConcurrentOption::some(3.to_string());
-    assert_eq!(x.as_deref(), Some("3"));
+    assert_eq!(unsafe { x.as_deref() }, Some("3"));
 
     _ = x.exclusive_take();
-    assert_eq!(x.as_deref(), None);
+    assert_eq!(unsafe { x.as_deref() }, None);
 }
 
 // &self - with-order

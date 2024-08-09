@@ -73,7 +73,10 @@ impl<T> ConcurrentOption<T> {
         T: Deref,
     {
         match self.state.load(order) {
-            SOME => Some(unsafe { self.value_ref() }),
+            SOME => {
+                let x = &*self.value.get();
+                Some(x.assume_init_ref())
+            }
             _ => None,
         }
     }

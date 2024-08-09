@@ -27,7 +27,7 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(unsafe { p.unwrap().as_ref() }, Some(&3.to_string()));
     /// ```
     pub fn raw_get(&self) -> Option<*const T> {
-        match self.mut_handle(SOME, SOME) {
+        match self.spin_get_handle(SOME, SOME) {
             Some(_handle) => {
                 let x = unsafe { &*self.value.get() };
                 Some(x.as_ptr())
@@ -65,7 +65,7 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(unsafe { x.as_ref() }, Some(&7.to_string()));
     /// ```
     pub fn raw_get_mut(&self) -> Option<*mut T> {
-        match self.mut_handle(SOME, SOME) {
+        match self.spin_get_handle(SOME, SOME) {
             Some(_handle) => {
                 let x = unsafe { &mut *self.value.get() };
                 Some(x.as_mut_ptr())

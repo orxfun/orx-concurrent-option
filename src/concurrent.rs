@@ -103,7 +103,7 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(maybe.unwrap(), 7.to_string());
     /// ```
     pub fn initialize_if_none(&self, value: T) -> bool {
-        match self.mut_handle(NONE, SOME) {
+        match self.get_handle(NONE, SOME) {
             Some(_handle) => {
                 unsafe { &mut *self.value.get() }.write(value);
                 true
@@ -243,7 +243,7 @@ impl<T> ConcurrentOption<T> {
     where
         F: FnMut(&mut T),
     {
-        match self.mut_handle(SOME, SOME) {
+        match self.spin_get_handle(SOME, SOME) {
             Some(_handle) => {
                 let x = unsafe { &mut *self.value.get() };
                 let x = unsafe { MaybeUninit::assume_init_mut(x) };
@@ -276,7 +276,7 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(y, None);
     /// ```
     pub fn take(&self) -> Option<T> {
-        match self.mut_handle(SOME, NONE) {
+        match self.spin_get_handle(SOME, NONE) {
             Some(_handle) => {
                 let x = unsafe { &*self.value.get() };
                 Some(unsafe { MaybeUninit::assume_init_read(x) })
@@ -316,32 +316,36 @@ impl<T> ConcurrentOption<T> {
         P: FnOnce(&mut T) -> bool,
         T: std::fmt::Debug,
     {
-        match self
-            .state
-            .compare_exchange(SOME, RESERVED, ORDER_LOAD, ORDER_LOAD)
-            .is_ok()
-        {
-            true => {
-                let x = unsafe { &mut *self.value.get() };
-                let x_mut = unsafe { MaybeUninit::assume_init_mut(x) };
-                let output = match predicate(x_mut) {
-                    false => None,
-                    true => Some(unsafe { MaybeUninit::assume_init_read(x) }),
-                };
+        loop {
+            match self
+                .state
+                .compare_exchange(SOME, RESERVED, ORDER_LOAD, ORDER_LOAD)
+            {
+                Ok(_) => {
+                    let x = unsafe { &mut *self.value.get() };
+                    let x_mut = unsafe { MaybeUninit::assume_init_mut(x) };
+                    let output = match predicate(x_mut) {
+                        false => None,
+                        true => Some(unsafe { MaybeUninit::assume_init_read(x) }),
+                    };
 
-                let success_state = match output.is_some() {
-                    true => NONE,
-                    false => SOME,
-                };
-                self.state
-                    .compare_exchange(RESERVED, success_state, ORDER_STORE, ORDER_STORE)
-                    .expect(
-                        "Failed to update the concurrent state after concurrent state mutation",
-                    );
+                    let success_state = match output.is_some() {
+                        true => NONE,
+                        false => SOME,
+                    };
+                    self.state
+                        .compare_exchange(RESERVED, success_state, ORDER_STORE, ORDER_STORE)
+                        .expect(
+                            "Failed to update the concurrent state after concurrent state mutation",
+                        );
 
-                output
+                    return output;
+                }
+                Err(previous_state) => match previous_state {
+                    RESERVED => continue,
+                    _ => return None,
+                },
             }
-            false => None,
         }
     }
 
@@ -366,13 +370,13 @@ impl<T> ConcurrentOption<T> {
     /// ```
     pub fn replace(&self, value: T) -> Option<T> {
         loop {
-            if let Some(_handle) = self.mut_handle(SOME, SOME) {
+            if let Some(_handle) = self.spin_get_handle(SOME, SOME) {
                 let x = unsafe { (*self.value.get()).assume_init_mut() };
                 let old = std::mem::replace(x, value);
                 return Some(old);
             }
 
-            if let Some(_handle) = self.mut_handle(NONE, SOME) {
+            if let Some(_handle) = self.spin_get_handle(NONE, SOME) {
                 let x = unsafe { &mut *self.value.get() };
                 x.write(value);
                 return None;
@@ -416,13 +420,13 @@ impl<T> ConcurrentOption<T> {
     /// ```
     pub unsafe fn insert(&self, value: T) -> &mut T {
         loop {
-            if let Some(_handle) = self.mut_handle(SOME, SOME) {
+            if let Some(_handle) = self.spin_get_handle(SOME, SOME) {
                 let x = unsafe { (*self.value.get()).assume_init_mut() };
                 let _old = std::mem::replace(x, value);
                 return x;
             }
 
-            if let Some(_handle) = self.mut_handle(NONE, SOME) {
+            if let Some(_handle) = self.spin_get_handle(NONE, SOME) {
                 let x = unsafe { &mut *self.value.get() };
                 x.write(value);
                 return unsafe { x.assume_init_mut() };
@@ -491,11 +495,11 @@ impl<T> ConcurrentOption<T> {
         F: FnOnce() -> T,
     {
         loop {
-            if let Some(_handle) = self.mut_handle(SOME, SOME) {
+            if let Some(_handle) = self.spin_get_handle(SOME, SOME) {
                 return unsafe { (*self.value.get()).assume_init_mut() };
             }
 
-            if let Some(_handle) = self.mut_handle(NONE, SOME) {
+            if let Some(_handle) = self.spin_get_handle(NONE, SOME) {
                 let x = unsafe { &mut *self.value.get() };
                 x.write(f());
                 return unsafe { x.assume_init_mut() };

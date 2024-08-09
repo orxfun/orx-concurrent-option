@@ -157,6 +157,7 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(x, ConcurrentOption::some(3));
     /// assert_eq!(old, None);
     /// ```
+    #[allow(clippy::panic, clippy::missing_panics_doc)]
     pub fn exclusive_replace(&mut self, value: T) -> Option<T> {
         match self.state.load(Ordering::Relaxed) {
             SOME => {
@@ -199,7 +200,7 @@ impl<T> ConcurrentOption<T> {
     /// *val = 3;
     /// assert_eq!(opt.unwrap(), 3);
     /// ```
-    #[allow(clippy::missing_panics_doc)]
+    #[allow(clippy::panic, clippy::missing_panics_doc)]
     pub fn exclusive_insert(&mut self, value: T) -> &mut T {
         match self.state.load(Ordering::Relaxed) {
             SOME => {
@@ -264,7 +265,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// assert_eq!(x, ConcurrentOption::some(7));
     /// ```
-    #[allow(clippy::missing_panics_doc)]
+    #[allow(clippy::panic, clippy::missing_panics_doc)]
     pub fn exclusive_get_or_insert_with<F>(&mut self, f: F) -> &mut T
     where
         F: FnOnce() -> T,

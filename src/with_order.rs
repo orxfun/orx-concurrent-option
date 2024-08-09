@@ -24,6 +24,20 @@ impl<T> ConcurrentOption<T> {
     ///
     /// Depending on requirement of the use case, `Relaxed`, `Acquire` or `SeqCst` can be used as the `order`.
     ///
+    /// # Safety
+    ///
+    /// Note that creating a valid reference part of this method is thread safe.
+    ///
+    /// The method is `unsafe` due to the returned reference to the underlying value.
+    ///
+    /// * It is safe to use this method if the returned reference is discarded (miri would still complain).
+    /// * It is also safe to use this method if the caller is able to guarantee that there exist
+    /// no concurrent writes while holding onto this reference.
+    ///   * One such case is using `as_ref` together with `initialize_when_none` method.
+    /// This is perfectly safe since the value will be written only once,
+    /// and `as_ref` returns a valid reference only after the value is initialized.
+    /// * Otherwise, it will lead to an **Undefined Behavior** due to data race.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -52,6 +66,20 @@ impl<T> ConcurrentOption<T> {
     /// to the original one, additionally coercing the contents via [`Deref`].
     ///
     /// Depending on requirement of the use case, `Relaxed`, `Acquire` or `SeqCst` can be used as the `order`.
+    ///
+    /// # Safety
+    ///
+    /// Note that creating a valid reference part of this method is thread safe.
+    ///
+    /// The method is `unsafe` due to the returned reference to the underlying value.
+    ///
+    /// * It is safe to use this method if the returned reference is discarded (miri would still complain).
+    /// * It is also safe to use this method if the caller is able to guarantee that there exist
+    /// no concurrent writes while holding onto this reference.
+    ///   * One such case is using `as_ref` together with `initialize_when_none` method.
+    /// This is perfectly safe since the value will be written only once,
+    /// and `as_ref` returns a valid reference only after the value is initialized.
+    /// * Otherwise, it will lead to an **Undefined Behavior** due to data race.
     ///
     /// # Examples
     ///
@@ -86,6 +114,20 @@ impl<T> ConcurrentOption<T> {
     /// * no elements otherwise.
     ///
     /// Depending on requirement of the use case, `Relaxed`, `Acquire` or `SeqCst` can be used as the `order`.
+    ///
+    /// # Safety
+    ///
+    /// Note that creating a valid reference part of this method is thread safe.
+    ///
+    /// The method is `unsafe` due to the returned reference to the underlying value.
+    ///
+    /// * It is safe to use this method if the returned reference is discarded (miri would still complain).
+    /// * It is also safe to use this method if the caller is able to guarantee that there exist
+    /// no concurrent writes while holding onto this reference.
+    ///   * One such case is using `as_ref` together with `initialize_when_none` method.
+    /// This is perfectly safe since the value will be written only once,
+    /// and `as_ref` returns a valid reference only after the value is initialized.
+    /// * Otherwise, it will lead to an **Undefined Behavior** due to data race.
     ///
     /// # Examples
     ///

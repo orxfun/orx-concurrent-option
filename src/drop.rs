@@ -5,6 +5,7 @@ use crate::{
 use std::sync::atomic::Ordering;
 
 impl<T> Drop for ConcurrentOption<T> {
+    #[allow(clippy::panic)]
     fn drop(&mut self) {
         match self.state.load(Ordering::Relaxed) {
             SOME => {

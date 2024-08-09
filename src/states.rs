@@ -19,6 +19,7 @@ pub enum State {
 }
 
 impl State {
+    #[allow(clippy::panic, clippy::missing_panics_doc)]
     pub(crate) fn new(state: u8) -> Self {
         match state {
             NONE => Self::None,

@@ -26,9 +26,14 @@ impl<T> ConcurrentOption<T> {
     /// assert!(p.is_some());
     /// assert_eq!(unsafe { p.unwrap().as_ref() }, Some(&3.to_string()));
     /// ```
-    #[inline]
     pub fn raw_get(&self) -> Option<*const T> {
-        self.raw_get_with_order(ORDER_LOAD)
+        match self.mut_handle(SOME, SOME) {
+            Some(_handle) => {
+                let x = unsafe { &*self.value.get() };
+                Some(x.as_ptr())
+            }
+            None => None,
+        }
     }
 
     /// Returns:
@@ -59,9 +64,14 @@ impl<T> ConcurrentOption<T> {
     /// let _ = unsafe { p.replace(7.to_string()) }; // only write leads to memory leak
     /// assert_eq!(x.as_ref(), Some(&7.to_string()));
     /// ```
-    #[inline]
     pub fn raw_get_mut(&self) -> Option<*mut T> {
-        self.raw_get_mut_with_order(ORDER_LOAD)
+        match self.mut_handle(SOME, SOME) {
+            Some(_handle) => {
+                let x = unsafe { &mut *self.value.get() };
+                Some(x.as_mut_ptr())
+            }
+            None => None,
+        }
     }
 
     // row with-order

@@ -59,7 +59,7 @@ fn reader(do_sleep: bool, maybe: &ConcurrentOption<String>) {
         sleep(do_sleep);
 
         let is_nine_or_seven = maybe
-            .map_ref(|x| x == &7.to_string() || x == &9.to_string())
+            .map(|x| x == &7.to_string() || x == &9.to_string())
             .unwrap_or(false);
         assert!(is_nine_or_seven);
     }

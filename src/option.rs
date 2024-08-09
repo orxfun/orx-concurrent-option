@@ -725,6 +725,126 @@ impl<T> ConcurrentOption<T> {
         x.assume_init_read()
     }
 
+    // concurrent - &self
+
+    /// Thread safe method to map the reference of the underlying value with the given function `f`.
+    ///
+    /// Returns
+    /// * None if the option is None
+    /// * `f(&value)` if the option is Some(value)
+    ///
+    /// # Concurrency Notes
+    ///
+    /// Notice that `map` is a composition of `as_ref` and `map`.
+    /// However, it is stronger in terms of thread safety since the access to the value is controlled
+    /// and a reference to the underlying value is not leaked outside the option.
+    ///
+    /// Therefore, `map` must be preferred in a concurrent program:
+    /// * the map operation via `map` guarantees that the underlying value will not be updated before the operation; while
+    /// * the alternative approach with `as_ref` is subject to data race if the state of the optional is concurrently being
+    /// updated by methods such as `take`.
+    ///   * an exception to this is the `initialize_if_none` method which fits very well the initialize-once scenarios;
+    /// here, `as_ref` and `initialize_if_none` can safely be called concurrently from multiple threads.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use orx_concurrent_option::*;
+    ///
+    /// let x = ConcurrentOption::<String>::none();
+    /// let len = x.map(|x| x.len());
+    /// assert_eq!(len, None);
+    ///
+    /// let x = ConcurrentOption::some("foo".to_string());
+    /// let len = x.map(|x| x.len());
+    /// assert_eq!(len, Some(3));
+    /// ```
+    pub fn map<U, F>(&self, f: F) -> Option<U>
+    where
+        F: FnOnce(&T) -> U,
+    {
+        match self.mut_handle(SOME, SOME) {
+            Some(_handle) => {
+                let x = unsafe { &*self.value.get() };
+                let x = unsafe { MaybeUninit::assume_init_ref(x) };
+                Some(f(x))
+            }
+            None => None,
+        }
+    }
+
+    /// Returns the provided default result (if none),
+    /// or applies a function to the contained value (if any).
+    ///
+    /// Arguments passed to `map_or` are eagerly evaluated; if you are passing
+    /// the result of a function call, it is recommended to use [`map_or_else`],
+    /// which is lazily evaluated.
+    ///
+    /// [`map_or_else`]: ConcurrentOption::map_or_else
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use orx_concurrent_option::*;
+    ///
+    /// let x = ConcurrentOption::some("foo");
+    /// assert_eq!(x.map_or(42, |v| v.len()), 3);
+    ///
+    /// let x: ConcurrentOption<&str> = ConcurrentOption::none();
+    /// assert_eq!(x.map_or(42, |v| v.len()), 42);
+    /// ```
+    pub fn map_or<U, F>(&self, default: U, f: F) -> U
+    where
+        F: FnOnce(&T) -> U,
+    {
+        self.map(f).unwrap_or(default)
+    }
+
+    /// Computes a default function result (if none), or
+    /// applies a different function to the contained value (if any).
+    ///
+    /// # Basic examples
+    ///
+    /// ```
+    /// use orx_concurrent_option::*;
+    ///
+    /// let k = 21;
+    ///
+    /// let x = ConcurrentOption::some("foo");
+    /// assert_eq!(x.map_or_else(|| 2 * k, |v| v.len()), 3);
+    ///
+    /// let x: ConcurrentOption<&str> = ConcurrentOption::none();
+    /// assert_eq!(x.map_or_else(|| 2 * k, |v| v.len()), 42);
+    /// ```
+    pub fn map_or_else<U, D, F>(&self, default: D, f: F) -> U
+    where
+        D: FnOnce() -> U,
+        F: FnOnce(&T) -> U,
+    {
+        self.map(f).unwrap_or_else(default)
+    }
+
+    /// Thread safe method that returns `true` if the option is a Some and the value inside of it matches a predicate.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use orx_concurrent_option::*;
+    ///
+    /// let x = ConcurrentOption::some(2);
+    /// assert_eq!(x.is_some_and(|x| *x > 1), true);
+    ///
+    /// let x = ConcurrentOption::some(0);
+    /// assert_eq!(x.is_some_and(|x| *x > 1), false);
+    ///
+    /// let x: ConcurrentOption<i32> = ConcurrentOption::none();
+    /// assert_eq!(x.is_some_and(|x| *x > 1), false);
+    /// ```
+    #[inline]
+    pub fn is_some_and(&self, f: impl FnOnce(&T) -> bool) -> bool {
+        self.map(|x| f(x)).unwrap_or(false)
+    }
+
     /// Returns None if the option is None, otherwise returns `other`.
     ///
     /// Arguments passed to `and` are eagerly evaluated; if you are passing the
@@ -754,8 +874,8 @@ impl<T> ConcurrentOption<T> {
     /// let y: Option<&str> = None;
     /// assert_eq!(x.and(y), None);
     /// ```
-    pub fn and<U>(mut self, other: impl IntoOption<U>) -> Option<U> {
-        self.exclusive_take().and(other.into_option())
+    pub fn and<U>(&self, other: impl IntoOption<U>) -> Option<U> {
+        self.map(|_| ()).and(other.into_option())
     }
 
     /// Returns None if the option is None, otherwise calls `f` with the
@@ -768,8 +888,8 @@ impl<T> ConcurrentOption<T> {
     /// ```
     /// use orx_concurrent_option::*;
     ///
-    /// fn sq_then_to_string(x: u32) -> Option<String> {
-    ///     x.checked_mul(x).map(|sq| sq.to_string())
+    /// fn sq_then_to_string(x: &u32) -> Option<String> {
+    ///     x.checked_mul(*x).map(|sq| sq.to_string())
     /// }
     ///
     /// assert_eq!(ConcurrentOption::some(2).and_then(sq_then_to_string), Some(4.to_string()));
@@ -783,20 +903,27 @@ impl<T> ConcurrentOption<T> {
     /// ```
     /// use orx_concurrent_option::*;
     ///
-    /// fn sq_then_to_string(x: u32) -> ConcurrentOption<String> {
-    ///     x.checked_mul(x).map(|sq| sq.to_string()).into()
+    /// fn sq_then_to_string(x: &u32) -> ConcurrentOption<String> {
+    ///     x.checked_mul(*x).map(|sq| sq.to_string()).into()
     /// }
     ///
     /// assert_eq!(ConcurrentOption::some(2).and_then(sq_then_to_string), Some(4.to_string()));
     /// assert_eq!(ConcurrentOption::some(1_000_000).and_then(sq_then_to_string), None); // overflowed!
     /// assert_eq!(ConcurrentOption::none().and_then(sq_then_to_string), None);
     /// ```
-    pub fn and_then<U, V, F>(mut self, f: F) -> Option<U>
+    pub fn and_then<U, V, F>(&self, f: F) -> Option<U>
     where
         V: IntoOption<U>,
-        F: FnOnce(T) -> V,
+        F: FnOnce(&T) -> V,
     {
-        self.exclusive_take().and_then(|x| f(x).into_option())
+        match self.mut_handle(SOME, SOME) {
+            Some(_handle) => {
+                let x = unsafe { &*self.value.get() };
+                let x = unsafe { MaybeUninit::assume_init_ref(x) };
+                f(x).into_option()
+            }
+            None => None,
+        }
     }
 
     /// Returns None if the option is None, otherwise calls `predicate`
@@ -810,6 +937,20 @@ impl<T> ConcurrentOption<T> {
     /// the `Option<T>` being an iterator over one or zero elements. `filter()`
     /// lets you decide which elements to keep.
     ///
+    /// # Safety
+    ///
+    /// Note that creating a valid reference part of this method is thread safe.
+    ///
+    /// The method is `unsafe` due to the returned reference to the underlying value.
+    ///
+    /// * It is safe to use this method if the returned reference is discarded (miri would still complain).
+    /// * It is also safe to use this method if the caller is able to guarantee that there exist
+    /// no concurrent writes while holding onto this reference.
+    ///   * One such case is using `as_ref` together with `initialize_when_none` method.
+    /// This is perfectly safe since the value will be written only once,
+    /// and `as_ref` returns a valid reference only after the value is initialized.
+    /// * Otherwise, it will lead to an **Undefined Behavior** due to data race.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -818,253 +959,27 @@ impl<T> ConcurrentOption<T> {
     /// fn is_even(n: &i32) -> bool {
     ///     n % 2 == 0
     /// }
-    ///
-    /// assert_eq!(ConcurrentOption::none().filter(is_even), None);
-    /// assert_eq!(ConcurrentOption::some(3).filter(is_even), None);
-    /// assert_eq!(ConcurrentOption::some(4).filter(is_even), Some(4));
+    /// unsafe
+    /// {
+    ///     assert_eq!(ConcurrentOption::none().filter(is_even), None);
+    ///     assert_eq!(ConcurrentOption::some(3).filter(is_even), None);
+    ///     assert_eq!(ConcurrentOption::some(4).filter(is_even), Some(&4));
+    /// }
     /// ```
-    pub fn filter<P>(mut self, predicate: P) -> Option<T>
+    pub unsafe fn filter<P>(&self, predicate: P) -> Option<&T>
     where
         P: FnOnce(&T) -> bool,
     {
-        self.exclusive_take().and_then(|x| match predicate(&x) {
-            true => Some(x),
-            false => None,
-        })
-    }
-
-    /// Maps an `ConcurrentOption<T>` to `Option<U>` by applying a function to a contained value (if `Some`) or returns `None` (if `None`).
-    ///
-    /// # Examples
-    ///
-    /// Calculates the length of an <code>Option<[String]></code> as an
-    /// <code>Option<[usize]></code>, consuming the original:
-    ///
-    /// [String]: ../../std/string/struct.String.html "String"
-    ///
-    /// ```
-    /// use orx_concurrent_option::*;
-    ///
-    /// let maybe_some_string = ConcurrentOption::some(String::from("Hello, World!"));
-    /// // `Option::map` takes self *by value*, consuming `maybe_some_string`
-    /// let maybe_some_len = maybe_some_string.map(|s| s.len());
-    /// assert_eq!(maybe_some_len, Some(13));
-    ///
-    /// let x: ConcurrentOption<&str> = ConcurrentOption::none();
-    /// assert_eq!(x.map(|s| s.len()), None);
-    /// ```
-    pub fn map<U, F>(mut self, f: F) -> Option<U>
-    where
-        F: FnOnce(T) -> U,
-    {
-        self.exclusive_take().map(f)
-    }
-
-    /// Returns the provided default result (if none),
-    /// or applies a function to the contained value (if any).
-    ///
-    /// Arguments passed to `map_or` are eagerly evaluated; if you are passing
-    /// the result of a function call, it is recommended to use [`map_or_else`],
-    /// which is lazily evaluated.
-    ///
-    /// [`map_or_else`]: ConcurrentOption::map_or_else
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use orx_concurrent_option::*;
-    ///
-    /// let x = ConcurrentOption::some("foo");
-    /// assert_eq!(x.map_or(42, |v| v.len()), 3);
-    ///
-    /// let x: ConcurrentOption<&str> = ConcurrentOption::none();
-    /// assert_eq!(x.map_or(42, |v| v.len()), 42);
-    /// ```
-    pub fn map_or<U, F>(mut self, default: U, f: F) -> U
-    where
-        F: FnOnce(T) -> U,
-    {
-        self.exclusive_take().map_or(default, f)
-    }
-
-    /// Computes a default function result (if none), or
-    /// applies a different function to the contained value (if any).
-    ///
-    /// # Basic examples
-    ///
-    /// ```
-    /// use orx_concurrent_option::*;
-    ///
-    /// let k = 21;
-    ///
-    /// let x = ConcurrentOption::some("foo");
-    /// assert_eq!(x.map_or_else(|| 2 * k, |v| v.len()), 3);
-    ///
-    /// let x: ConcurrentOption<&str> = ConcurrentOption::none();
-    /// assert_eq!(x.map_or_else(|| 2 * k, |v| v.len()), 42);
-    /// ```
-    pub fn map_or_else<U, D, F>(mut self, default: D, f: F) -> U
-    where
-        D: FnOnce() -> U,
-        F: FnOnce(T) -> U,
-    {
-        self.exclusive_take().map_or_else(default, f)
-    }
-
-    /// Transforms the `ConcurrentOption<T>` into a [`Result<T, E>`], mapping Some(v) to
-    /// [`Ok(v)`] and None to [`Err(err)`].
-    ///
-    /// Arguments passed to `ok_or` are eagerly evaluated; if you are passing the
-    /// result of a function call, it is recommended to use [`ok_or_else`], which is
-    /// lazily evaluated.
-    ///
-    /// [`Ok(v)`]: Ok
-    /// [`Err(err)`]: Err
-    /// [`ok_or_else`]: ConcurrentOption::ok_or_else
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use orx_concurrent_option::*;
-    ///
-    /// let x = ConcurrentOption::some("foo");
-    /// assert_eq!(x.ok_or(0), Ok("foo"));
-    ///
-    /// let x: ConcurrentOption<&str> = ConcurrentOption::none();
-    /// assert_eq!(x.ok_or(0), Err(0));
-    /// ```
-    pub fn ok_or<E>(mut self, err: E) -> Result<T, E> {
-        self.exclusive_take().ok_or(err)
-    }
-
-    /// Transforms the `Option<T>` into a [`Result<T, E>`], mapping `Some(v)` to
-    /// [`Ok(v)`] and `None` to [`Err(err())`].
-    ///
-    /// [`Ok(v)`]: Ok
-    /// [`Err(err())`]: Err
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use orx_concurrent_option::*;
-    ///
-    /// let x = ConcurrentOption::some("foo");
-    /// assert_eq!(x.ok_or_else(|| 0), Ok("foo"));
-    ///
-    /// let x: ConcurrentOption<&str> = ConcurrentOption::none();
-    /// assert_eq!(x.ok_or_else(|| 0), Err(0));
-    /// ```
-    pub fn ok_or_else<E, F>(mut self, err: F) -> Result<T, E>
-    where
-        F: FnOnce() -> E,
-    {
-        self.exclusive_take().ok_or_else(err)
-    }
-
-    /// Returns the option if it contains a value, otherwise returns `other`.
-    ///
-    /// Arguments passed to `or` are eagerly evaluated; if you are passing the
-    /// result of a function call, it is recommended to use [`or_else`], which is
-    /// lazily evaluated.
-    ///
-    /// [`or_else`]: ConcurrentOption::or_else
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use orx_concurrent_option::*;
-    ///
-    /// let x = ConcurrentOption::some(2);
-    /// let y = ConcurrentOption::none();
-    /// assert_eq!(x.or(y), Some(2));
-    ///
-    /// let x = ConcurrentOption::none();
-    /// let y = Some(100);
-    /// assert_eq!(x.or(y), Some(100));
-    ///
-    /// let x = ConcurrentOption::some(2);
-    /// let y = Some(100);
-    /// assert_eq!(x.or(y), Some(2));
-    ///
-    /// let x: ConcurrentOption<i32> = ConcurrentOption::none();
-    /// let y = None;
-    /// assert_eq!(x.or(y), None);
-    /// ```
-    pub fn or(mut self, other: impl IntoOption<T>) -> Option<T> {
-        self.exclusive_take().or(other.into_option())
-    }
-
-    /// Returns the option if it contains a value, otherwise calls `f` and
-    /// returns the result.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use orx_concurrent_option::*;
-    ///
-    /// fn nobody() -> ConcurrentOption<&'static str> { ConcurrentOption::none() }
-    /// fn vikings() -> ConcurrentOption<&'static str> { ConcurrentOption::some("vikings") }
-    ///
-    /// assert_eq!(ConcurrentOption::some("barbarians").or_else(vikings), Some("barbarians"));
-    /// assert_eq!(ConcurrentOption::none().or_else(vikings), Some("vikings"));
-    /// assert_eq!(ConcurrentOption::none().or_else(nobody), None);
-    /// ```
-    pub fn or_else<F, O>(mut self, f: F) -> Option<T>
-    where
-        O: IntoOption<T>,
-        F: FnOnce() -> O,
-    {
-        self.exclusive_take().or_else(|| f().into_option())
-    }
-
-    /// Returns `Some` if exactly one of `self`, `other` is `Some`, otherwise returns `None`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use orx_concurrent_option::*;
-    ///
-    /// let x = ConcurrentOption::some(2);
-    /// let y: Option<u32> = None;
-    /// assert_eq!(x.xor(y), Some(2));
-    ///
-    /// let x: ConcurrentOption<u32> = ConcurrentOption::none();
-    /// let y = Some(2);
-    /// assert_eq!(x.xor(y), Some(2));
-    ///
-    /// let x = ConcurrentOption::some(2);
-    /// let y = Some(2);
-    /// assert_eq!(x.xor(y), None);
-    ///
-    /// let x: ConcurrentOption<u32> = ConcurrentOption::none();
-    /// let y: ConcurrentOption<u32> = ConcurrentOption::none();
-    /// assert_eq!(x.xor(y), None);
-    /// ```
-    pub fn xor(mut self, other: impl IntoOption<T>) -> Option<T> {
-        self.exclusive_take().xor(other.into_option())
-    }
-
-    /// Zips `self` with another option (`Option` or `ConcurrentOption`).
-    ///
-    /// If `self` is `Some(s)` and `other` is `Some(o)`, this method returns `Some((s, o))`.
-    /// Otherwise, `None` is returned.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use orx_concurrent_option::*;
-    ///
-    /// let x = ConcurrentOption::some(1);
-    /// let y = Some("hi");
-    /// let z = ConcurrentOption::<u8>::none();
-    ///
-    /// assert_eq!(x.clone().zip(y), Some((1, "hi")));
-    /// assert_eq!(x.zip(z), None);
-    /// ```
-    pub fn zip<U>(mut self, other: impl IntoOption<U>) -> Option<(T, U)> {
-        match (self.exclusive_take(), other.into_option().take()) {
-            (Some(x), Some(y)) => Some((x, y)),
-            _ => None,
+        match self.mut_handle(SOME, SOME) {
+            Some(_handle) => {
+                let x = unsafe { &*self.value.get() };
+                let x = unsafe { MaybeUninit::assume_init_ref(x) };
+                match predicate(x) {
+                    true => Some(x),
+                    false => None,
+                }
+            }
+            None => None,
         }
     }
 }
@@ -1161,30 +1076,5 @@ impl<T> ConcurrentOption<Option<T>> {
     /// ```
     pub fn flatten(mut self) -> Option<T> {
         self.exclusive_take().and_then(|x| x)
-    }
-}
-
-impl<T, U> ConcurrentOption<(T, U)> {
-    /// Unzips a ConcurrentOption containing a tuple of two Option's.
-    ///
-    /// If `self` is `ConcurrentOption::some((a, b))` this method returns `(Some(a), Some(b))`.
-    /// Otherwise, `(None, None)` is returned.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use orx_concurrent_option::*;
-    ///
-    /// let x = ConcurrentOption::some((1, "hi"));
-    /// let y = ConcurrentOption::<(u8, u32)>::none();
-    ///
-    /// assert_eq!(x.unzip(), (Some(1), Some("hi")));
-    /// assert_eq!(y.unzip(), (None, None));
-    /// ```
-    pub fn unzip(mut self) -> (Option<T>, Option<U>) {
-        match self.exclusive_take() {
-            Some((x, y)) => (Some(x), Some(y)),
-            None => (None, None),
-        }
     }
 }

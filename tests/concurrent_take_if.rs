@@ -51,7 +51,7 @@ fn concurrent_take_if_multiple_writer(num_writers: usize, num_readers: usize, do
 fn reader(do_sleep: bool, maybe: &ConcurrentOption<String>) {
     for _ in 0..100 {
         sleep(do_sleep);
-        let is_none_or_seven = maybe.map_ref(|x| x == &7.to_string()).unwrap_or(true);
+        let is_none_or_seven = maybe.map(|x| x == &7.to_string()).unwrap_or(true);
         assert!(is_none_or_seven);
     }
 }

@@ -396,6 +396,56 @@ impl<T> ConcurrentOption<T> {
         }
     }
 
+    /// Partially thread safe method to insert `value` into the option, and then to return a mutable reference to it.
+    ///
+    /// If the option already contains a value, the old value is dropped.
+    ///
+    /// See also [`Option::get_or_insert`], which doesn't update the value if
+    /// the option already contains Some.
+    ///
+    /// # Safety
+    ///
+    /// Note that the insertion part of this method is thread safe.
+    ///
+    /// The methods is `unsafe` due to the returned mutable reference to the underlying value.
+    ///
+    /// * It is safe to use this method if the returned mutable reference is discarded (miri would still complain).
+    /// * It is also safe to use this method if the caller is able to guarantee that there exist
+    /// no concurrent reads or writes while mutating the value.
+    /// * Otherwise, it will lead to an **Undefined Behavior** due to data race.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use orx_concurrent_option::*;
+    ///
+    /// let opt: ConcurrentOption<_> = ConcurrentOption::none();
+    ///
+    /// let val = unsafe { opt.insert(1) };
+    /// assert_eq!(*val, 1);
+    /// assert_eq!(opt.as_ref(), Some(&1));
+    ///
+    /// let val = unsafe { opt.insert(2) };
+    /// assert_eq!(*val, 2);
+    /// *val = 3;
+    /// assert_eq!(opt.unwrap(), 3);
+    /// ```
+    pub unsafe fn insert(&self, value: T) -> &mut T {
+        loop {
+            if let Some(_handle) = self.mut_handle(SOME, SOME) {
+                let x = unsafe { (*self.value.get()).assume_init_mut() };
+                let _old = std::mem::replace(x, value);
+                return x;
+            }
+
+            if let Some(_handle) = self.mut_handle(NONE, SOME) {
+                let x = unsafe { &mut *self.value.get() };
+                x.write(value);
+                return unsafe { x.assume_init_mut() };
+            }
+        }
+    }
+
     // common traits
 
     /// Clones the concurrent option with the desired `order` into an Option.

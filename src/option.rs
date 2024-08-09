@@ -77,7 +77,7 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(unsafe { x.as_ref() }, None);
     /// ```
     pub unsafe fn as_ref(&self) -> Option<&T> {
-        match self.mut_handle(SOME, SOME) {
+        match self.spin_get_handle(SOME, SOME) {
             Some(_handle) => {
                 let x = &*self.value.get();
                 Some(x.assume_init_ref())
@@ -120,7 +120,7 @@ impl<T> ConcurrentOption<T> {
     where
         T: Deref,
     {
-        match self.mut_handle(SOME, SOME) {
+        match self.spin_get_handle(SOME, SOME) {
             Some(_handle) => {
                 let x = &*self.value.get();
                 Some(x.assume_init_ref())
@@ -205,7 +205,7 @@ impl<T> ConcurrentOption<T> {
     where
         F: FnOnce(&T) -> U,
     {
-        match self.mut_handle(SOME, SOME) {
+        match self.spin_get_handle(SOME, SOME) {
             Some(_handle) => {
                 let x = unsafe { &*self.value.get() };
                 let x = unsafe { MaybeUninit::assume_init_ref(x) };
@@ -358,7 +358,7 @@ impl<T> ConcurrentOption<T> {
         V: IntoOption<U>,
         F: FnOnce(&T) -> V,
     {
-        match self.mut_handle(SOME, SOME) {
+        match self.spin_get_handle(SOME, SOME) {
             Some(_handle) => {
                 let x = unsafe { &*self.value.get() };
                 let x = unsafe { MaybeUninit::assume_init_ref(x) };
@@ -412,7 +412,7 @@ impl<T> ConcurrentOption<T> {
     where
         P: FnOnce(&T) -> bool,
     {
-        match self.mut_handle(SOME, SOME) {
+        match self.spin_get_handle(SOME, SOME) {
             Some(_handle) => {
                 let x = unsafe { &*self.value.get() };
                 let x = unsafe { MaybeUninit::assume_init_ref(x) };

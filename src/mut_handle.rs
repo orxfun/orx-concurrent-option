@@ -7,7 +7,22 @@ pub(crate) struct MutHandle<'a> {
 }
 
 impl<'a> MutHandle<'a> {
-    pub fn try_get(state: &'a AtomicU8, initial_state: u8, success_state: u8) -> Option<Self> {
+    pub fn get(state: &'a AtomicU8, initial_state: u8, success_state: u8) -> Option<Self> {
+        match state
+            .compare_exchange(initial_state, RESERVED, ORDER_LOAD, ORDER_LOAD)
+            .is_ok()
+        {
+            true => {
+                return Some(Self {
+                    state,
+                    success_state,
+                })
+            }
+            false => None,
+        }
+    }
+
+    pub fn spin_get(state: &'a AtomicU8, initial_state: u8, success_state: u8) -> Option<Self> {
         loop {
             match state.compare_exchange(initial_state, RESERVED, ORDER_LOAD, ORDER_LOAD) {
                 Ok(_) => {

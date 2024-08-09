@@ -109,13 +109,16 @@ pub struct ConcurrentOption<T> {
 }
 
 impl<T> ConcurrentOption<T> {
-    pub(crate) fn mut_handle(&self, initial_state: u8, success_state: u8) -> Option<MutHandle<'_>> {
-        MutHandle::try_get(&self.state, initial_state, success_state)
+    pub(crate) fn get_handle(&self, initial_state: u8, success_state: u8) -> Option<MutHandle<'_>> {
+        MutHandle::get(&self.state, initial_state, success_state)
     }
 
-    pub(crate) unsafe fn value_ref(&self) -> &T {
-        let x = &*self.value.get();
-        x.assume_init_ref()
+    pub(crate) fn spin_get_handle(
+        &self,
+        initial_state: u8,
+        success_state: u8,
+    ) -> Option<MutHandle<'_>> {
+        MutHandle::spin_get(&self.state, initial_state, success_state)
     }
 }
 

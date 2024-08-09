@@ -1,5 +1,5 @@
 use crate::{states::*, ConcurrentOption};
-use std::sync::atomic::Ordering;
+use std::{mem::MaybeUninit, sync::atomic::Ordering};
 
 impl<T> ConcurrentOption<T> {
     // concurrent state mutation - special
@@ -223,7 +223,7 @@ impl<T> ConcurrentOption<T> {
         self.state.store(SOME, ORDER_STORE);
     }
 
-    /// Maps the reference of the underlying value with the given function `f`.
+    /// Thread safe method to map the reference of the underlying value with the given function `f`.
     ///
     /// Returns
     /// * None if the option is None
@@ -231,10 +231,11 @@ impl<T> ConcurrentOption<T> {
     ///
     /// # Concurrency Notes
     ///
-    /// Alternatively, one can take an optional reference of the underlying value by `as_ref`
-    /// and mapping outside this function.
+    /// Notice that `map_ref` is a composition of `as_ref` and `map`.
+    /// However, it is stronger in terms of thread safety since the access to the value is controlled
+    /// and a reference to the underlying value is not leaked outside the option.
     ///
-    /// However,
+    /// Therefore, `map_ref` must be preferred in a concurrent program:
     /// * the map operation via `map_ref` guarantees that the underlying value will not be updated before the operation; while
     /// * the alternative approach with `as_ref` is subject to data race if the state of the optional is concurrently being
     /// updated by methods such as `take`.
@@ -261,7 +262,7 @@ impl<T> ConcurrentOption<T> {
         match self.mut_handle(SOME, SOME) {
             Some(_handle) => {
                 let x = unsafe { &*self.value.get() };
-                let x = unsafe { std::mem::MaybeUninit::assume_init_ref(x) };
+                let x = unsafe { MaybeUninit::assume_init_ref(x) };
                 Some(f(x))
             }
             None => None,
@@ -294,7 +295,7 @@ impl<T> ConcurrentOption<T> {
         match self.mut_handle(SOME, NONE) {
             Some(_handle) => {
                 let x = unsafe { &*self.value.get() };
-                Some(unsafe { std::mem::MaybeUninit::assume_init_read(x) })
+                Some(unsafe { MaybeUninit::assume_init_read(x) })
             }
             None => None,
         }
@@ -338,10 +339,10 @@ impl<T> ConcurrentOption<T> {
         {
             true => {
                 let x = unsafe { &mut *self.value.get() };
-                let x_mut = unsafe { std::mem::MaybeUninit::assume_init_mut(x) };
+                let x_mut = unsafe { MaybeUninit::assume_init_mut(x) };
                 let output = match predicate(x_mut) {
                     false => None,
-                    true => Some(unsafe { std::mem::MaybeUninit::assume_init_read(x) }),
+                    true => Some(unsafe { MaybeUninit::assume_init_read(x) }),
                 };
 
                 let success_state = match output.is_some() {
@@ -357,6 +358,41 @@ impl<T> ConcurrentOption<T> {
                 output
             }
             false => None,
+        }
+    }
+
+    /// Thread safe method to replace the actual value in the option by the value given in parameter,
+    /// returning the old value if present,
+    /// leaving a Some in its place without de-initializing either one.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use orx_concurrent_option::*;
+    ///
+    /// let x = ConcurrentOption::some(2);
+    /// let old = x.replace(5);
+    /// assert_eq!(x, ConcurrentOption::some(5));
+    /// assert_eq!(old, Some(2));
+    ///
+    /// let x: ConcurrentOption<u32> = ConcurrentOption::none();
+    /// let old = x.replace(3);
+    /// assert_eq!(x, ConcurrentOption::some(3));
+    /// assert_eq!(old, None);
+    /// ```
+    pub fn replace(&self, value: T) -> Option<T> {
+        loop {
+            if let Some(_handle) = self.mut_handle(SOME, SOME) {
+                let x = unsafe { (*self.value.get()).assume_init_mut() };
+                let old = std::mem::replace(x, value);
+                return Some(old);
+            }
+
+            if let Some(_handle) = self.mut_handle(NONE, SOME) {
+                let x = unsafe { &mut *self.value.get() };
+                x.write(value);
+                return None;
+            }
         }
     }
 

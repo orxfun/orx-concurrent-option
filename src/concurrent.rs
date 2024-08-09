@@ -105,19 +105,12 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(maybe.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
     /// ```
     pub fn initialize_if_none(&self, value: T) -> bool {
-        match self
-            .state
-            .compare_exchange(NONE, RESERVED_FOR_READING, ORDER_LOAD, ORDER_LOAD)
-            .is_ok()
-        {
-            false => false,
-            true => {
+        match self.mut_handle(NONE, SOME) {
+            Some(_handle) => {
                 unsafe { &mut *self.value.get() }.write(value);
-                self.state
-                    .compare_exchange(RESERVED_FOR_READING, SOME, ORDER_STORE, ORDER_STORE)
-                    .expect("Failed to update the concurrent state on `initialize_if_none`.");
                 true
             }
+            None => false,
         }
     }
 
@@ -265,21 +258,13 @@ impl<T> ConcurrentOption<T> {
     where
         F: FnOnce(&T) -> U,
     {
-        match self
-            .state
-            .compare_exchange(SOME, RESERVED_FOR_READING, ORDER_LOAD, ORDER_LOAD)
-            .is_ok()
-        {
-            false => None,
-            true => {
+        match self.mut_handle(SOME, SOME) {
+            Some(_handle) => {
                 let x = unsafe { &*self.value.get() };
                 let x = unsafe { std::mem::MaybeUninit::assume_init_ref(x) };
-                let y = f(x);
-                self.state
-                    .compare_exchange(RESERVED_FOR_READING, SOME, ORDER_STORE, ORDER_STORE)
-                    .expect("Failed to update the concurrent state on `initialize_if_none`.");
-                Some(y)
+                Some(f(x))
             }
+            None => None,
         }
     }
 
@@ -306,20 +291,12 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(y, None);
     /// ```
     pub fn take(&self) -> Option<T> {
-        match self
-            .state
-            .compare_exchange(SOME, RESERVED_FOR_READING, ORDER_LOAD, ORDER_LOAD)
-            .is_ok()
-        {
-            false => None,
-            true => {
+        match self.mut_handle(SOME, NONE) {
+            Some(_handle) => {
                 let x = unsafe { &*self.value.get() };
-                let x = Some(unsafe { std::mem::MaybeUninit::assume_init_read(x) });
-                self.state
-                    .compare_exchange(RESERVED_FOR_READING, NONE, ORDER_STORE, ORDER_STORE)
-                    .expect("Failed to update the concurrent state on `initialize_if_none`.");
-                x
+                Some(unsafe { std::mem::MaybeUninit::assume_init_read(x) })
             }
+            None => None,
         }
     }
 

@@ -414,14 +414,14 @@ impl<T> ConcurrentOption<T> {
     pub fn exclusive_replace(&mut self, value: T) -> Option<T> {
         match self.state.load(Ordering::Relaxed) {
             SOME => {
-                self.state.store(RESERVED_FOR_READING, Ordering::Relaxed);
+                self.state.store(RESERVED, Ordering::Relaxed);
                 let x = unsafe { (*self.value.get()).assume_init_mut() };
                 let old = std::mem::replace(x, value);
                 self.state.store(SOME, Ordering::Relaxed);
                 Some(old)
             }
             NONE => {
-                self.state.store(RESERVED_FOR_READING, Ordering::Relaxed);
+                self.state.store(RESERVED, Ordering::Relaxed);
                 self.value = MaybeUninit::new(value).into();
                 self.state.store(SOME, Ordering::Relaxed);
                 None
@@ -458,13 +458,13 @@ impl<T> ConcurrentOption<T> {
     pub fn exclusive_insert(&mut self, value: T) -> &mut T {
         match self.state.load(Ordering::Relaxed) {
             SOME => {
-                self.state.store(RESERVED_FOR_READING, Ordering::Relaxed);
+                self.state.store(RESERVED, Ordering::Relaxed);
                 let x = unsafe { (*self.value.get()).assume_init_mut() };
                 let _ = std::mem::replace(x, value);
                 self.state.store(SOME, Ordering::Relaxed);
             }
             NONE => {
-                self.state.store(RESERVED_FOR_READING, Ordering::Relaxed);
+                self.state.store(RESERVED, Ordering::Relaxed);
                 self.value = MaybeUninit::new(value).into();
                 self.state.store(SOME, Ordering::Relaxed);
             }
@@ -527,7 +527,7 @@ impl<T> ConcurrentOption<T> {
         match self.state.load(Ordering::Relaxed) {
             SOME => self.exclusive_as_mut().expect("is guaranteed to be some"),
             NONE => {
-                self.state.store(RESERVED_FOR_READING, Ordering::Relaxed);
+                self.state.store(RESERVED, Ordering::Relaxed);
                 self.value = MaybeUninit::new(f()).into();
                 self.state.store(SOME, Ordering::Relaxed);
                 self.exclusive_as_mut().expect("is guaranteed to be some")

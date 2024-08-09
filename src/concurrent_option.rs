@@ -1,5 +1,7 @@
 use std::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::AtomicU8};
 
+use crate::mut_handle::MutHandle;
+
 /// A lock-free concurrent option type which enables to safely initialize and read the data concurrently.
 ///
 /// ## ConcurrentOption Methods In Four Groups
@@ -109,6 +111,10 @@ pub struct ConcurrentOption<T> {
 }
 
 impl<T> ConcurrentOption<T> {
+    pub(crate) fn mut_handle(&self, initial_state: u8, success_state: u8) -> Option<MutHandle<'_>> {
+        MutHandle::try_get(&self.state, initial_state, success_state)
+    }
+
     pub(crate) unsafe fn value_ref(&self) -> &T {
         let x = &*self.value.get();
         x.assume_init_ref()

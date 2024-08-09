@@ -133,12 +133,15 @@ mod common_traits;
 mod concurrent;
 mod concurrent_option;
 mod drop;
+mod exclusive;
+mod into;
 mod into_option;
 mod mut_handle;
 mod new;
 mod option;
 mod raw;
 mod states;
+mod with_order;
 
 pub use common_traits::iter;
 

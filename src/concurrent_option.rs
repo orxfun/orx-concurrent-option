@@ -1,6 +1,5 @@
-use std::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::AtomicU8};
-
 use crate::mut_handle::MutHandle;
+use std::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::AtomicU8};
 
 /// A lock-free concurrent option type which enables to safely initialize and read the data concurrently.
 ///

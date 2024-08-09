@@ -8,7 +8,7 @@ impl<'a, T> IntoIterator for &'a ConcurrentOption<T> {
     type IntoIter = Iter<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.iter(Ordering::Relaxed)
+        self.iter_with_order(Ordering::Relaxed)
     }
 }
 
@@ -17,7 +17,7 @@ impl<'a, T> IntoIterator for &'a mut ConcurrentOption<T> {
     type IntoIter = IterMut<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.iter_mut()
+        self.exclusive_iter_mut()
     }
 }
 
@@ -27,7 +27,7 @@ impl<T> IntoIterator for ConcurrentOption<T> {
     type IntoIter = std::option::IntoIter<T>;
 
     fn into_iter(mut self) -> Self::IntoIter {
-        self.take().into_iter()
+        self.exclusive_take().into_iter()
     }
 }
 

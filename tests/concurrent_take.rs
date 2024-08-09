@@ -1,27 +1,24 @@
-#![cfg(feature = "experimental")]
-
 use orx_concurrent_option::*;
-use std::{sync::atomic::Ordering, time::Duration};
+use std::time::Duration;
 use test_case::test_matrix;
 
 #[test_matrix(
     [2, 4, 8, 16],
-    [false, true],
-    [Ordering::SeqCst, Ordering::Acquire]
+    [false, true]
 )]
-fn concurrent_take_single_writer(num_readers: usize, do_sleep: bool, read_order: Ordering) {
+fn concurrent_take_single_writer(num_readers: usize, do_sleep: bool) {
     let maybe = ConcurrentOption::some(7.to_string());
     let maybe_ref = &maybe;
 
     std::thread::scope(|s| {
         for _ in 0..(num_readers / 2) {
-            s.spawn(move || read(do_sleep, maybe_ref, read_order));
+            s.spawn(move || reader(do_sleep, maybe_ref));
         }
 
-        s.spawn(move || take(do_sleep, maybe_ref));
+        s.spawn(move || taker(do_sleep, maybe_ref));
 
         for _ in 0..(num_readers / 2) {
-            s.spawn(move || read(do_sleep, maybe_ref, read_order));
+            s.spawn(move || reader(do_sleep, maybe_ref));
         }
     });
 }
@@ -29,49 +26,41 @@ fn concurrent_take_single_writer(num_readers: usize, do_sleep: bool, read_order:
 #[test_matrix(
     [4, 8],
     [2, 4, 8, 16],
-    [false, true],
-    [Ordering::SeqCst, Ordering::Acquire]
+    [false, true]
 )]
-fn concurrent_take_multiple_writer(
-    num_writers: usize,
-    num_readers: usize,
-    do_sleep: bool,
-    read_order: Ordering,
-) {
+fn concurrent_take_multiple_writer(num_writers: usize, num_readers: usize, do_sleep: bool) {
     let maybe = ConcurrentOption::some(7.to_string());
     let maybe_ref = &maybe;
 
     std::thread::scope(|s| {
         for _ in 0..(num_writers / 2) {
-            s.spawn(move || take(do_sleep, maybe_ref));
+            s.spawn(move || taker(do_sleep, maybe_ref));
         }
 
         for _ in 0..num_readers {
-            s.spawn(move || read(do_sleep, maybe_ref, read_order));
+            s.spawn(move || reader(do_sleep, maybe_ref));
         }
 
         for _ in 0..(num_writers / 2) {
-            s.spawn(move || take(do_sleep, maybe_ref));
+            s.spawn(move || taker(do_sleep, maybe_ref));
         }
     });
 }
 
 // helpers
-fn read(do_sleep: bool, maybe_ref: &ConcurrentOption<String>, read_order: Ordering) {
+fn reader(do_sleep: bool, maybe: &ConcurrentOption<String>) {
     for _ in 0..100 {
         sleep(do_sleep);
-        let read = maybe_ref.as_ref(read_order);
-        let is_none = read.is_none();
-        let is_seven = read == Some(&7.to_string());
-        assert!(is_none || is_seven);
+        let is_none_or_seven = maybe.map_ref(|x| x == &7.to_string()).unwrap_or(true);
+        assert!(is_none_or_seven);
     }
 }
 
-fn take(do_sleep: bool, maybe_ref: &ConcurrentOption<String>) {
+fn taker(do_sleep: bool, maybe: &ConcurrentOption<String>) {
     for i in 0..100 {
         sleep(do_sleep);
         if i == 50 {
-            let _ = unsafe { maybe_ref.take_x() };
+            let _ = maybe.take();
         }
     }
 }
@@ -81,4 +70,25 @@ fn sleep(do_sleep: bool) {
         let duration = Duration::from_millis(24);
         std::thread::sleep(duration);
     }
+}
+
+#[test]
+fn abc() {
+    let do_sleep = true;
+    let num_readers = 8;
+
+    let maybe = ConcurrentOption::some(7.to_string());
+    let maybe_ref = &maybe;
+
+    std::thread::scope(|s| {
+        for _ in 0..(num_readers / 2) {
+            s.spawn(move || reader(do_sleep, maybe_ref));
+        }
+
+        s.spawn(move || taker(do_sleep, maybe_ref));
+
+        for _ in 0..(num_readers / 2) {
+            s.spawn(move || reader(do_sleep, maybe_ref));
+        }
+    });
 }

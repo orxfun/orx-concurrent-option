@@ -22,7 +22,7 @@ impl<T: Debug> Debug for ConcurrentOption<T> {
     /// assert_eq!(y, "ConcurrentNone");
     ///
     /// let x = ConcurrentOption::some(3.to_string());
-    /// let y = format!("{:?}", x.as_ref(Ordering::Acquire)); // clone with desired ordering Acquire
+    /// let y = format!("{:?}", x.as_ref_with_order(Ordering::Acquire)); // clone with desired ordering Acquire
     /// assert_eq!(y, "Some(\"3\")");
     /// ```
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

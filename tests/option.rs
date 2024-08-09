@@ -4,42 +4,42 @@ use std::sync::atomic::Ordering;
 // &self
 
 #[test]
-fn as_ref() {
+fn as_ref_with_order() {
     let mut x = ConcurrentOption::some(3.to_string());
-    assert_eq!(x.as_ref(Ordering::Relaxed), Some(&3.to_string()));
+    assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
 
-    _ = x.take();
-    assert_eq!(x.as_ref(Ordering::Relaxed), None);
+    _ = x.exclusive_take();
+    assert_eq!(x.as_ref_with_order(Ordering::Relaxed), None);
 }
 
 #[test]
 fn as_deref() {
     let mut x = ConcurrentOption::some(3.to_string());
-    assert_eq!(x.as_deref(Ordering::Relaxed), Some("3"));
+    assert_eq!(x.as_deref_with_order(Ordering::Relaxed), Some("3"));
 
-    _ = x.take();
-    assert_eq!(x.as_deref(Ordering::Relaxed), None);
+    _ = x.exclusive_take();
+    assert_eq!(x.as_deref_with_order(Ordering::Relaxed), None);
 }
 
 // &mut self
 
 #[test]
-fn take() {
+fn exclusive_take() {
     let mut x = ConcurrentOption::some(3.to_string());
-    let y = x.take();
-    assert!(x.is_none(Ordering::Relaxed));
+    let y = x.exclusive_take();
+    assert!(x.is_none_with_order(Ordering::Relaxed));
     assert_eq!(y, Some(3.to_string()));
 
-    let y = x.take();
-    assert!(x.is_none(Ordering::Relaxed));
+    let y = x.exclusive_take();
+    assert!(x.is_none_with_order(Ordering::Relaxed));
     assert_eq!(y, None);
 }
 
 #[test]
-fn take_if() {
+fn exclusive_take_if() {
     let mut x = ConcurrentOption::some(42);
 
-    let prev = x.take_if(|v| {
+    let prev = x.exclusive_take_if(|v| {
         if *v == 42 {
             *v += 1;
             false
@@ -50,68 +50,68 @@ fn take_if() {
     assert_eq!(x, ConcurrentOption::some(43));
     assert_eq!(prev, None);
 
-    let prev = x.take_if(|v| *v == 43);
+    let prev = x.exclusive_take_if(|v| *v == 43);
     assert_eq!(x, ConcurrentOption::<i32>::none());
     assert_eq!(prev, Some(43));
 }
 
 #[test]
-fn as_mut() {
+fn exclusive_as_mut() {
     let mut x = ConcurrentOption::some("abc".to_string());
-    _ = x.as_mut().map(|x| {
+    _ = x.exclusive_as_mut().map(|x| {
         x.make_ascii_uppercase();
         x
     });
-    assert_eq!(x.as_deref(Ordering::Relaxed), Some("ABC"));
+    assert_eq!(x.as_deref_with_order(Ordering::Relaxed), Some("ABC"));
 
-    _ = x.take();
-    assert!(x.as_mut().is_none());
+    _ = x.exclusive_take();
+    assert!(x.exclusive_as_mut().is_none());
 }
 
 #[test]
-fn as_deref_mut() {
+fn exclusive_as_deref_mut() {
     let mut x = ConcurrentOption::some("abc".to_string());
-    _ = x.as_deref_mut().map(|x| {
+    _ = x.exclusive_as_deref_mut().map(|x| {
         x.make_ascii_uppercase();
         x
     });
-    assert_eq!(x.as_deref(Ordering::Relaxed), Some("ABC"));
+    assert_eq!(x.as_deref_with_order(Ordering::Relaxed), Some("ABC"));
 
-    _ = x.take();
-    assert!(x.as_deref_mut().is_none());
+    _ = x.exclusive_take();
+    assert!(x.exclusive_as_deref_mut().is_none());
 }
 
 #[test]
-fn replace() {
+fn exclusive_replace() {
     let mut x = ConcurrentOption::some(2);
-    let old = x.replace(5);
+    let old = x.exclusive_replace(5);
     assert_eq!(x, ConcurrentOption::some(5));
     assert_eq!(old, Some(2));
 
     let mut x = ConcurrentOption::<u32>::none();
-    let old = x.replace(3);
+    let old = x.exclusive_replace(3);
     assert_eq!(x, ConcurrentOption::some(3));
     assert_eq!(old, None);
 }
 
 #[test]
-fn insert() {
+fn exclusive_insert() {
     let mut opt = ConcurrentOption::<u32>::none();
-    let val = opt.insert(1);
+    let val = opt.exclusive_insert(1);
     assert_eq!(*val, 1);
-    assert_eq!(opt.as_ref(Ordering::Relaxed), Some(&1));
-    let val = opt.insert(2);
+    assert_eq!(opt.as_ref_with_order(Ordering::Relaxed), Some(&1));
+    let val = opt.exclusive_insert(2);
     assert_eq!(*val, 2);
     *val = 3;
     assert_eq!(opt.unwrap(), 3);
 }
 
 #[test]
-fn get_or_insert() {
+fn exclusive_get_or_insert() {
     let mut x = ConcurrentOption::<u32>::none();
 
     {
-        let y: &mut u32 = x.get_or_insert(5);
+        let y: &mut u32 = x.exclusive_get_or_insert(5);
         assert_eq!(y, &5);
 
         *y = 7;
@@ -121,11 +121,11 @@ fn get_or_insert() {
 }
 
 #[test]
-fn get_or_insert_with() {
+fn exclusive_get_or_insert_with() {
     let mut x = ConcurrentOption::<u32>::none();
 
     {
-        let y: &mut u32 = x.get_or_insert_with(|| 5);
+        let y: &mut u32 = x.exclusive_get_or_insert_with(|| 5);
         assert_eq!(y, &5);
 
         *y = 7;
@@ -374,10 +374,10 @@ fn or_else() {
 #[test]
 fn xor() {
     let mut opt = ConcurrentOption::<i32>::none();
-    let val = opt.insert(1);
+    let val = opt.exclusive_insert(1);
     assert_eq!(*val, 1);
-    assert_eq!(opt.as_ref(Ordering::Relaxed), Some(&1));
-    let val = opt.insert(2);
+    assert_eq!(opt.as_ref_with_order(Ordering::Relaxed), Some(&1));
+    let val = opt.exclusive_insert(2);
     assert_eq!(*val, 2);
     *val = 3;
     assert_eq!(opt.unwrap(), 3);

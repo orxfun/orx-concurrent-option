@@ -38,6 +38,6 @@ impl<T> IntoOption<T> for Option<T> {
 
 impl<T> IntoOption<T> for ConcurrentOption<T> {
     fn into_option(mut self) -> Option<T> {
-        self.take()
+        self.exclusive_take()
     }
 }

@@ -28,12 +28,12 @@ impl<T> ConcurrentOption<T> {
     /// let x = ConcurrentOption::<String>::none();
     /// let inserted = x.initialize_if_none(3.to_string());
     /// assert!(inserted);
-    /// assert_eq!(x.as_ref(Ordering::Relaxed), Some(&3.to_string()));
+    /// assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
     ///
     /// let x = ConcurrentOption::some(7.to_string());
     /// let inserted = x.initialize_if_none(3.to_string()); // does nothing
     /// assert!(!inserted);
-    /// assert_eq!(x.as_ref(Ordering::Relaxed), Some(&7.to_string()));
+    /// assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
     /// ```
     ///
     /// A more advanced and useful example is demonstrated below:
@@ -55,7 +55,7 @@ impl<T> ConcurrentOption<T> {
     ///     for _ in 0..100 {
     ///         std::thread::sleep(std::time::Duration::from_millis(100));
     ///
-    ///         let read = maybe.as_ref(Ordering::Acquire);
+    ///         let read = maybe.as_ref_with_order(Ordering::Acquire);
     ///
     ///         let is_none = read.is_none();
     ///         let is_seven = read == Some(&7.to_string());
@@ -100,7 +100,7 @@ impl<T> ConcurrentOption<T> {
     ///     }
     /// });
     ///
-    /// assert_eq!(maybe.as_ref(Ordering::Relaxed), Some(&7.to_string()));
+    /// assert_eq!(maybe.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
     /// ```
     pub fn initialize_if_none(&self, value: T) -> bool {
         const ORDER_LOAD: Ordering = Ordering::SeqCst;
@@ -108,14 +108,14 @@ impl<T> ConcurrentOption<T> {
 
         match self
             .state
-            .compare_exchange(NONE, WRITING, ORDER_LOAD, ORDER_LOAD)
+            .compare_exchange(NONE, RESERVED_FOR_READING, ORDER_LOAD, ORDER_LOAD)
             .is_ok()
         {
             false => false,
             true => {
                 unsafe { &mut *self.value.get() }.write(value);
                 self.state
-                    .compare_exchange(WRITING, SOME, ORDER_STORE, ORDER_STORE)
+                    .compare_exchange(RESERVED_FOR_READING, SOME, ORDER_STORE, ORDER_STORE)
                     .expect("Failed to update the concurrent state on `initialize_if_none`.");
                 true
             }
@@ -158,13 +158,13 @@ impl<T> ConcurrentOption<T> {
     ///
     /// let x = ConcurrentOption::<String>::none();
     /// unsafe { x.initialize_unchecked(3.to_string()) };
-    /// assert_eq!(x.as_ref(Ordering::Relaxed), Some(&3.to_string()));
+    /// assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
     ///
     /// #[cfg(not(miri))]
     /// {
     ///     let x = ConcurrentOption::some(7.to_string());
     ///     unsafe { x.initialize_unchecked(3.to_string()) }; // undefined behavior!
-    ///     assert_eq!(x.as_ref(Ordering::Relaxed), Some(&3.to_string()));
+    ///     assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
     /// }
     /// ```
     ///
@@ -187,7 +187,7 @@ impl<T> ConcurrentOption<T> {
     ///     for _ in 0..100 {
     ///         std::thread::sleep(std::time::Duration::from_millis(100));
     ///
-    ///         let read = maybe.as_ref(Ordering::Acquire);
+    ///         let read = maybe.as_ref_with_order(Ordering::Acquire);
     ///
     ///         let is_none = read.is_none();
     ///         let is_seven = read == Some(&7.to_string());
@@ -224,7 +224,7 @@ impl<T> ConcurrentOption<T> {
     ///     s.spawn(|| unsafe_initializer(maybe_ref));
     /// });
     ///
-    /// assert_eq!(maybe.as_ref(Ordering::Relaxed), Some(&7.to_string()));
+    /// assert_eq!(maybe.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
     /// ```
     pub unsafe fn initialize_unchecked(&self, value: T) {
         const ORDER_STORE: Ordering = Ordering::SeqCst;
@@ -233,24 +233,98 @@ impl<T> ConcurrentOption<T> {
         self.state.store(SOME, ORDER_STORE);
     }
 
-    #[cfg(feature = "experimental")]
-    pub unsafe fn take_x(&self) -> Option<T> {
+    /// Thread safe method to take the value out of the option if Some,
+    /// leaving a None in its place.
+    ///
+    /// Has no impact and returns None, if the option is of None variant.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use orx_concurrent_option::*;
+    ///
+    /// let mut x = ConcurrentOption::some(42);
+    /// let y = x.take();
+    /// assert_eq!(x, ConcurrentOption::none());
+    /// assert_eq!(y, Some(42));
+    ///
+    /// let mut x: ConcurrentOption<u32> = ConcurrentOption::none();
+    /// let y = x.take();
+    /// assert_eq!(x, ConcurrentOption::none());
+    /// assert_eq!(y, None);
+    /// ```
+    pub fn take(&self) -> Option<T> {
         const ORDER_LOAD: Ordering = Ordering::SeqCst;
         const ORDER_STORE: Ordering = Ordering::SeqCst;
 
         match self
             .state
-            .compare_exchange(SOME, WRITING, ORDER_LOAD, ORDER_LOAD)
+            .compare_exchange(SOME, RESERVED_FOR_READING, ORDER_LOAD, ORDER_LOAD)
             .is_ok()
         {
             false => None,
             true => {
                 let x = unsafe { &*self.value.get() };
-                let x = Some(std::mem::MaybeUninit::assume_init_read(x));
+                let x = Some(unsafe { std::mem::MaybeUninit::assume_init_read(x) });
                 self.state
-                    .compare_exchange(WRITING, NONE, ORDER_STORE, ORDER_STORE)
+                    .compare_exchange(RESERVED_FOR_READING, NONE, ORDER_STORE, ORDER_STORE)
                     .expect("Failed to update the concurrent state on `initialize_if_none`.");
                 x
+            }
+        }
+    }
+
+    /// Maps the reference of the underlying value with the given function `f`.
+    ///
+    /// Returns
+    /// * None if the option is None
+    /// * `f(&value)` if the option is Some(value)
+    ///
+    /// # Concurrency Notes
+    ///
+    /// Alternatively, one can take an optional reference of the underlying value by `as_ref`
+    /// and mapping outside this function.
+    ///
+    /// However,
+    /// * the map operation via `map_ref` guarantees that the underlying value will not be updated before the operation; while
+    /// * the alternative approach with `as_ref` is subject to data race if the state of the optional is concurrently being
+    /// updated by methods such as `take`.
+    ///   * an exception to this is the `initialize_if_none` method which fits very well the initialize-once scenarios;
+    /// here, `as_ref` and `initialize_if_none` can safely be called concurrently from multiple threads.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use orx_concurrent_option::*;
+    ///
+    /// let x = ConcurrentOption::<String>::none();
+    /// let len = x.map_ref(|x| x.len());
+    /// assert_eq!(len, None);
+    ///
+    /// let x = ConcurrentOption::some("foo".to_string());
+    /// let len = x.map_ref(|x| x.len());
+    /// assert_eq!(len, Some(3));
+    /// ```
+    pub fn map_ref<U, F>(&self, f: F) -> Option<U>
+    where
+        F: FnOnce(&T) -> U,
+    {
+        const ORDER: Ordering = Ordering::SeqCst;
+
+        match self
+            .state
+            .compare_exchange(SOME, RESERVED_FOR_READING, ORDER, ORDER)
+            .is_ok()
+        {
+            false => None,
+            true => {
+                let x = unsafe { &*self.value.get() };
+                let x = unsafe { std::mem::MaybeUninit::assume_init_ref(x) };
+                let y = f(x);
+                self.state
+                    .compare_exchange(RESERVED_FOR_READING, SOME, ORDER, ORDER)
+                    .expect("Failed to update the concurrent state on `initialize_if_none`.");
+                Some(y)
             }
         }
     }
@@ -277,7 +351,7 @@ impl<T> ConcurrentOption<T> {
     where
         T: Clone,
     {
-        self.as_ref(order).cloned()
+        self.as_ref_with_order(order).cloned()
     }
 
     /// Returns whether or not self is equal to the `other` with the desired `order`.
@@ -310,7 +384,10 @@ impl<T> ConcurrentOption<T> {
     where
         T: PartialEq,
     {
-        match (self.as_ref(order), other.as_ref(order)) {
+        match (
+            self.as_ref_with_order(order),
+            other.as_ref_with_order(order),
+        ) {
             (None, None) => true,
             (Some(x), Some(y)) => x.eq(y),
             _ => false,
@@ -357,7 +434,10 @@ impl<T> ConcurrentOption<T> {
     {
         use std::cmp::Ordering::*;
 
-        match (self.as_ref(order), other.as_ref(order)) {
+        match (
+            self.as_ref_with_order(order),
+            other.as_ref_with_order(order),
+        ) {
             (Some(l), Some(r)) => l.partial_cmp(r),
             (Some(_), None) => Some(Greater),
             (None, Some(_)) => Some(Less),
@@ -401,7 +481,10 @@ impl<T> ConcurrentOption<T> {
     {
         use std::cmp::Ordering::*;
 
-        match (self.as_ref(order), other.as_ref(order)) {
+        match (
+            self.as_ref_with_order(order),
+            other.as_ref_with_order(order),
+        ) {
             (Some(l), Some(r)) => l.cmp(r),
             (Some(_), None) => Greater,
             (None, Some(_)) => Less,

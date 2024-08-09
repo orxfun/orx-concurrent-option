@@ -64,7 +64,7 @@ fn read(do_sleep: bool, maybe_ref: &ConcurrentOption<String>, read_order: Orderi
                 let read = unsafe { p.as_ref() }.unwrap();
                 assert_eq!(read, &7.to_string());
             }
-            None => ptr = maybe_ref.raw_get(read_order),
+            None => ptr = maybe_ref.raw_get_with_order(read_order),
         }
     }
 }

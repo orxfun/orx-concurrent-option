@@ -2,6 +2,8 @@ use crate::{states::*, ConcurrentOption};
 use std::sync::atomic::Ordering;
 
 impl<T> ConcurrentOption<T> {
+    // concurrent state mutation - special
+
     /// Thread safe method to initiate the value of the option with the given `value`.
     ///
     /// * Returns `true` if the option was `is_none` variant and initiated with the given value.
@@ -103,9 +105,6 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(maybe.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
     /// ```
     pub fn initialize_if_none(&self, value: T) -> bool {
-        const ORDER_LOAD: Ordering = Ordering::SeqCst;
-        const ORDER_STORE: Ordering = Ordering::SeqCst;
-
         match self
             .state
             .compare_exchange(NONE, RESERVED_FOR_READING, ORDER_LOAD, ORDER_LOAD)
@@ -227,51 +226,8 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(maybe.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
     /// ```
     pub unsafe fn initialize_unchecked(&self, value: T) {
-        const ORDER_STORE: Ordering = Ordering::SeqCst;
-
         unsafe { &mut *self.value.get() }.write(value);
         self.state.store(SOME, ORDER_STORE);
-    }
-
-    /// Thread safe method to take the value out of the option if Some,
-    /// leaving a None in its place.
-    ///
-    /// Has no impact and returns None, if the option is of None variant.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use orx_concurrent_option::*;
-    ///
-    /// let mut x = ConcurrentOption::some(42);
-    /// let y = x.take();
-    /// assert_eq!(x, ConcurrentOption::none());
-    /// assert_eq!(y, Some(42));
-    ///
-    /// let mut x: ConcurrentOption<u32> = ConcurrentOption::none();
-    /// let y = x.take();
-    /// assert_eq!(x, ConcurrentOption::none());
-    /// assert_eq!(y, None);
-    /// ```
-    pub fn take(&self) -> Option<T> {
-        const ORDER_LOAD: Ordering = Ordering::SeqCst;
-        const ORDER_STORE: Ordering = Ordering::SeqCst;
-
-        match self
-            .state
-            .compare_exchange(SOME, RESERVED_FOR_READING, ORDER_LOAD, ORDER_LOAD)
-            .is_ok()
-        {
-            false => None,
-            true => {
-                let x = unsafe { &*self.value.get() };
-                let x = Some(unsafe { std::mem::MaybeUninit::assume_init_read(x) });
-                self.state
-                    .compare_exchange(RESERVED_FOR_READING, NONE, ORDER_STORE, ORDER_STORE)
-                    .expect("Failed to update the concurrent state on `initialize_if_none`.");
-                x
-            }
-        }
     }
 
     /// Maps the reference of the underlying value with the given function `f`.
@@ -309,11 +265,9 @@ impl<T> ConcurrentOption<T> {
     where
         F: FnOnce(&T) -> U,
     {
-        const ORDER: Ordering = Ordering::SeqCst;
-
         match self
             .state
-            .compare_exchange(SOME, RESERVED_FOR_READING, ORDER, ORDER)
+            .compare_exchange(SOME, RESERVED_FOR_READING, ORDER_LOAD, ORDER_LOAD)
             .is_ok()
         {
             false => None,
@@ -322,9 +276,49 @@ impl<T> ConcurrentOption<T> {
                 let x = unsafe { std::mem::MaybeUninit::assume_init_ref(x) };
                 let y = f(x);
                 self.state
-                    .compare_exchange(RESERVED_FOR_READING, SOME, ORDER, ORDER)
+                    .compare_exchange(RESERVED_FOR_READING, SOME, ORDER_STORE, ORDER_STORE)
                     .expect("Failed to update the concurrent state on `initialize_if_none`.");
                 Some(y)
+            }
+        }
+    }
+
+    // concurrent state mutation
+
+    /// Thread safe method to take the value out of the option if Some,
+    /// leaving a None in its place.
+    ///
+    /// Has no impact and returns None, if the option is of None variant.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use orx_concurrent_option::*;
+    ///
+    /// let mut x = ConcurrentOption::some(42);
+    /// let y = x.take();
+    /// assert_eq!(x, ConcurrentOption::none());
+    /// assert_eq!(y, Some(42));
+    ///
+    /// let mut x: ConcurrentOption<u32> = ConcurrentOption::none();
+    /// let y = x.take();
+    /// assert_eq!(x, ConcurrentOption::none());
+    /// assert_eq!(y, None);
+    /// ```
+    pub fn take(&self) -> Option<T> {
+        match self
+            .state
+            .compare_exchange(SOME, RESERVED_FOR_READING, ORDER_LOAD, ORDER_LOAD)
+            .is_ok()
+        {
+            false => None,
+            true => {
+                let x = unsafe { &*self.value.get() };
+                let x = Some(unsafe { std::mem::MaybeUninit::assume_init_read(x) });
+                self.state
+                    .compare_exchange(RESERVED_FOR_READING, NONE, ORDER_STORE, ORDER_STORE)
+                    .expect("Failed to update the concurrent state on `initialize_if_none`.");
+                x
             }
         }
     }

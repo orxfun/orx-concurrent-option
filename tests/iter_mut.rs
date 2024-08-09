@@ -10,8 +10,8 @@ fn iter_mut_when_none() {
     }
 
     let mut x = ConcurrentOption::<String>::none();
-    validate(x.iter_mut());
-    validate(x.iter_mut().rev());
+    validate(x.exclusive_iter_mut());
+    validate(x.exclusive_iter_mut().rev());
     validate((&mut x).into_iter());
 }
 
@@ -26,14 +26,14 @@ fn iter_mut_when_some() {
     }
 
     let mut x = ConcurrentOption::some(3.to_string());
-    validate(x.iter_mut());
-    assert_eq!(x.as_ref(Ordering::Relaxed), Some(&7.to_string()));
+    validate(x.exclusive_iter_mut());
+    assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
 
     let mut x = ConcurrentOption::some(3.to_string());
-    validate(x.iter_mut().rev());
-    assert_eq!(x.as_ref(Ordering::Relaxed), Some(&7.to_string()));
+    validate(x.exclusive_iter_mut().rev());
+    assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
 
     let mut x = ConcurrentOption::some(3.to_string());
     validate((&mut x).into_iter());
-    assert_eq!(x.as_ref(Ordering::Relaxed), Some(&7.to_string()));
+    assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
 }

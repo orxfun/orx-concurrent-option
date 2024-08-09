@@ -19,12 +19,12 @@ impl<T> ConcurrentOption<T> {
     /// use std::sync::atomic::Ordering;
     ///
     /// let x: ConcurrentOption<u32> = ConcurrentOption::some(2);
-    /// assert_eq!(x.is_some(Ordering::Relaxed), true);
+    /// assert_eq!(x.is_some_with_order(Ordering::Relaxed), true);
     ///
     /// let x: ConcurrentOption<u32> = ConcurrentOption::none();
-    /// assert_eq!(x.is_some(Ordering::SeqCst), false);
+    /// assert_eq!(x.is_some_with_order(Ordering::SeqCst), false);
     /// ```
-    pub fn is_some(&self, order: Ordering) -> bool {
+    pub fn is_some_with_order(&self, order: Ordering) -> bool {
         self.state.load(order) == SOME
     }
 
@@ -39,12 +39,12 @@ impl<T> ConcurrentOption<T> {
     /// use std::sync::atomic::Ordering;
     ///
     /// let x: ConcurrentOption<u32> = ConcurrentOption::some(2);
-    /// assert_eq!(x.is_none(Ordering::Relaxed), false);
+    /// assert_eq!(x.is_none_with_order(Ordering::Relaxed), false);
     ///
     /// let x: ConcurrentOption<u32> = ConcurrentOption::none();
-    /// assert_eq!(x.is_none(Ordering::SeqCst), true);
+    /// assert_eq!(x.is_none_with_order(Ordering::SeqCst), true);
     /// ```
-    pub fn is_none(&self, order: Ordering) -> bool {
+    pub fn is_none_with_order(&self, order: Ordering) -> bool {
         self.state.load(order) == NONE
     }
 
@@ -59,12 +59,12 @@ impl<T> ConcurrentOption<T> {
     /// use std::sync::atomic::Ordering;
     ///
     /// let mut x = ConcurrentOption::some(3.to_string());
-    /// assert_eq!(x.as_ref(Ordering::Relaxed), Some(&3.to_string()));
+    /// assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
     ///
     /// _ = x.take();
-    /// assert_eq!(x.as_ref(Ordering::Acquire), None);
+    /// assert_eq!(x.as_ref_with_order(Ordering::Acquire), None);
     /// ```
-    pub fn as_ref(&self, order: Ordering) -> Option<&T> {
+    pub fn as_ref_with_order(&self, order: Ordering) -> Option<&T> {
         match self.state.load(order) {
             SOME => Some(unsafe { self.value_ref() }),
             _ => None,
@@ -85,12 +85,12 @@ impl<T> ConcurrentOption<T> {
     /// use std::sync::atomic::Ordering;
     ///
     /// let x: ConcurrentOption<String> = ConcurrentOption::some("hey".to_owned());
-    /// assert_eq!(x.as_deref(Ordering::Acquire), Some("hey"));
+    /// assert_eq!(x.as_deref_with_order(Ordering::Acquire), Some("hey"));
     ///
     /// let x: ConcurrentOption<String> = ConcurrentOption::none();
-    /// assert_eq!(x.as_deref(Ordering::SeqCst), None);
+    /// assert_eq!(x.as_deref_with_order(Ordering::SeqCst), None);
     /// ```
-    pub fn as_deref(&self, order: Ordering) -> Option<&<T as Deref>::Target>
+    pub fn as_deref_with_order(&self, order: Ordering) -> Option<&<T as Deref>::Target>
     where
         T: Deref,
     {
@@ -119,12 +119,12 @@ impl<T> ConcurrentOption<T> {
     /// }
     ///
     /// let x = ConcurrentOption::<String>::none();
-    /// validate(x.iter(Ordering::SeqCst));
-    /// validate(x.iter(Ordering::Relaxed).rev());
+    /// validate(x.iter_with_order(Ordering::SeqCst));
+    /// validate(x.iter_with_order(Ordering::Relaxed).rev());
     /// validate((&x).into_iter());
     /// ```
-    pub fn iter(&self, order: Ordering) -> crate::iter::Iter<'_, T> {
-        let maybe = self.as_ref(order);
+    pub fn iter_with_order(&self, order: Ordering) -> crate::iter::Iter<'_, T> {
+        let maybe = self.as_ref_with_order(order);
         crate::iter::Iter { maybe }
     }
 
@@ -141,16 +141,16 @@ impl<T> ConcurrentOption<T> {
     /// use orx_concurrent_option::*;
     ///
     /// let mut x: ConcurrentOption<String> = ConcurrentOption::some("hey".to_owned());
-    /// assert_eq!(x.as_deref_mut().map(|x| {
+    /// assert_eq!(x.exclusive_as_deref_mut().map(|x| {
     ///     x.make_ascii_uppercase();
     ///     x
     /// }), Some("HEY".to_owned().as_mut_str()));
     /// ```
-    pub fn as_deref_mut(&mut self) -> Option<&mut <T as Deref>::Target>
+    pub fn exclusive_as_deref_mut(&mut self) -> Option<&mut <T as Deref>::Target>
     where
         T: DerefMut,
     {
-        self.as_mut().map(|x| x.deref_mut())
+        self.exclusive_as_mut().map(|x| x.deref_mut())
     }
 
     /// Converts from `&mut Option<T>` to `Option<&mut T>`.
@@ -162,13 +162,13 @@ impl<T> ConcurrentOption<T> {
     /// use std::sync::atomic::Ordering;
     ///
     /// let mut x = ConcurrentOption::some(2);
-    /// match x.as_mut() {
+    /// match x.exclusive_as_mut() {
     ///     Some(v) => *v = 42,
     ///     None => {},
     /// }
-    /// assert_eq!(x.as_ref(Ordering::Relaxed), Some(&42));
+    /// assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&42));
     /// ```
-    pub fn as_mut(&mut self) -> Option<&mut T> {
+    pub fn exclusive_as_mut(&mut self) -> Option<&mut T> {
         match self.state.load(Ordering::Relaxed) {
             SOME => Some(unsafe { (*self.value.get()).assume_init_mut() }),
             _ => None,
@@ -183,17 +183,17 @@ impl<T> ConcurrentOption<T> {
     /// use orx_concurrent_option::*;
     ///
     /// let mut x = ConcurrentOption::some(42);
-    /// let y = x.take();
+    /// let y = x.exclusive_take();
     /// assert_eq!(x, ConcurrentOption::none());
     /// assert_eq!(y, Some(42));
     ///
     /// let mut x: ConcurrentOption<u32> = ConcurrentOption::none();
-    /// let y = x.take();
+    /// let y = x.exclusive_take();
     /// assert_eq!(x, ConcurrentOption::none());
     /// assert_eq!(y, None);
     /// ```
-    pub fn take(&mut self) -> Option<T> {
-        match self.is_some(Ordering::Relaxed) {
+    pub fn exclusive_take(&mut self) -> Option<T> {
+        match self.is_some_with_order(Ordering::Relaxed) {
             false => None,
             true => {
                 self.state.store(NONE, Ordering::Relaxed);
@@ -207,7 +207,7 @@ impl<T> ConcurrentOption<T> {
     /// `true` on a mutable reference to the value.
     ///
     /// In other words, replaces `self` with None if the predicate returns `true`.
-    /// This method operates similar to [`ConcurrentOption::take`] but conditional.
+    /// This method operates similar to [`ConcurrentOption::exclusive_take`] but conditional.
     ///
     /// # Examples
     ///
@@ -216,7 +216,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// let mut x = ConcurrentOption::some(42);
     ///
-    /// let prev = x.take_if(|v| if *v == 42 {
+    /// let prev = x.exclusive_take_if(|v| if *v == 42 {
     ///     *v += 1;
     ///     false
     /// } else {
@@ -225,16 +225,16 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(x, ConcurrentOption::some(43));
     /// assert_eq!(prev, None);
     ///
-    /// let prev = x.take_if(|v| *v == 43);
+    /// let prev = x.exclusive_take_if(|v| *v == 43);
     /// assert_eq!(x, ConcurrentOption::none());
     /// assert_eq!(prev, Some(43));
     /// ```
-    pub fn take_if<P>(&mut self, predicate: P) -> Option<T>
+    pub fn exclusive_take_if<P>(&mut self, predicate: P) -> Option<T>
     where
         P: FnOnce(&mut T) -> bool,
     {
-        match self.as_mut().map_or(false, predicate) {
-            true => self.take(),
+        match self.exclusive_as_mut().map_or(false, predicate) {
+            true => self.exclusive_take(),
             false => None,
         }
     }
@@ -249,17 +249,17 @@ impl<T> ConcurrentOption<T> {
     /// use orx_concurrent_option::*;
     ///
     /// let mut x = ConcurrentOption::some(4);
-    /// match x.iter_mut().next() {
+    /// match x.exclusive_iter_mut().next() {
     ///     Some(v) => *v = 42,
     ///     None => {},
     /// }
     /// assert_eq!(x, ConcurrentOption::some(42));
     ///
     /// let mut x: ConcurrentOption<u32> = ConcurrentOption::none();
-    /// assert_eq!(x.iter_mut().next(), None);
+    /// assert_eq!(x.exclusive_iter_mut().next(), None);
     /// ```
-    pub fn iter_mut(&mut self) -> crate::iter::IterMut<'_, T> {
-        let maybe = self.as_mut();
+    pub fn exclusive_iter_mut(&mut self) -> crate::iter::IterMut<'_, T> {
+        let maybe = self.exclusive_as_mut();
         crate::iter::IterMut { maybe }
     }
 
@@ -273,26 +273,26 @@ impl<T> ConcurrentOption<T> {
     /// use orx_concurrent_option::*;
     ///
     /// let mut x = ConcurrentOption::some(2);
-    /// let old = x.replace(5);
+    /// let old = x.exclusive_replace(5);
     /// assert_eq!(x, ConcurrentOption::some(5));
     /// assert_eq!(old, Some(2));
     ///
     /// let mut x: ConcurrentOption<u32> = ConcurrentOption::none();
-    /// let old = x.replace(3);
+    /// let old = x.exclusive_replace(3);
     /// assert_eq!(x, ConcurrentOption::some(3));
     /// assert_eq!(old, None);
     /// ```
-    pub fn replace(&mut self, value: T) -> Option<T> {
+    pub fn exclusive_replace(&mut self, value: T) -> Option<T> {
         match self.state.load(Ordering::Relaxed) {
             SOME => {
-                self.state.store(WRITING, Ordering::Relaxed);
+                self.state.store(RESERVED_FOR_READING, Ordering::Relaxed);
                 let x = unsafe { (*self.value.get()).assume_init_mut() };
                 let old = std::mem::replace(x, value);
                 self.state.store(SOME, Ordering::Relaxed);
                 Some(old)
             }
             NONE => {
-                self.state.store(WRITING, Ordering::Relaxed);
+                self.state.store(RESERVED_FOR_READING, Ordering::Relaxed);
                 self.value = MaybeUninit::new(value).into();
                 self.state.store(SOME, Ordering::Relaxed);
                 None
@@ -316,33 +316,33 @@ impl<T> ConcurrentOption<T> {
     ///
     /// let mut opt: ConcurrentOption<_> = ConcurrentOption::none();
     ///
-    /// let val = opt.insert(1);
+    /// let val = opt.exclusive_insert(1);
     /// assert_eq!(*val, 1);
-    /// assert_eq!(opt.as_ref(Ordering::Relaxed), Some(&1));
+    /// assert_eq!(opt.as_ref_with_order(Ordering::Relaxed), Some(&1));
     ///
-    /// let val = opt.insert(2);
+    /// let val = opt.exclusive_insert(2);
     /// assert_eq!(*val, 2);
     /// *val = 3;
     /// assert_eq!(opt.unwrap(), 3);
     /// ```
     #[allow(clippy::missing_panics_doc)]
-    pub fn insert(&mut self, value: T) -> &mut T {
+    pub fn exclusive_insert(&mut self, value: T) -> &mut T {
         match self.state.load(Ordering::Relaxed) {
             SOME => {
-                self.state.store(WRITING, Ordering::Relaxed);
+                self.state.store(RESERVED_FOR_READING, Ordering::Relaxed);
                 let x = unsafe { (*self.value.get()).assume_init_mut() };
                 let _ = std::mem::replace(x, value);
                 self.state.store(SOME, Ordering::Relaxed);
             }
             NONE => {
-                self.state.store(WRITING, Ordering::Relaxed);
+                self.state.store(RESERVED_FOR_READING, Ordering::Relaxed);
                 self.value = MaybeUninit::new(value).into();
                 self.state.store(SOME, Ordering::Relaxed);
             }
             _ => panic!("ConcurrentOption value is `insert`ed while its value is being written."),
         }
 
-        self.as_mut().expect("should be some")
+        self.exclusive_as_mut().expect("should be some")
     }
 
     /// Inserts `value` into the option if it is None, then
@@ -359,7 +359,7 @@ impl<T> ConcurrentOption<T> {
     /// let mut x = ConcurrentOption::none();
     ///
     /// {
-    ///     let y: &mut u32 = x.get_or_insert(5);
+    ///     let y: &mut u32 = x.exclusive_get_or_insert(5);
     ///     assert_eq!(y, &5);
     ///
     ///     *y = 7;
@@ -367,8 +367,8 @@ impl<T> ConcurrentOption<T> {
     ///
     /// assert_eq!(x, ConcurrentOption::some(7));
     /// ```
-    pub fn get_or_insert(&mut self, value: T) -> &mut T {
-        self.get_or_insert_with(|| value)
+    pub fn exclusive_get_or_insert(&mut self, value: T) -> &mut T {
+        self.exclusive_get_or_insert_with(|| value)
     }
 
     /// Inserts a value computed from `f` into the option if it is None,
@@ -382,7 +382,7 @@ impl<T> ConcurrentOption<T> {
     /// let mut x = ConcurrentOption::none();
     ///
     /// {
-    ///     let y: &mut u32 = x.get_or_insert_with(|| 5);
+    ///     let y: &mut u32 = x.exclusive_get_or_insert_with(|| 5);
     ///     assert_eq!(y, &5);
     ///
     ///     *y = 7;
@@ -391,17 +391,17 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(x, ConcurrentOption::some(7));
     /// ```
     #[allow(clippy::missing_panics_doc)]
-    pub fn get_or_insert_with<F>(&mut self, f: F) -> &mut T
+    pub fn exclusive_get_or_insert_with<F>(&mut self, f: F) -> &mut T
     where
         F: FnOnce() -> T,
     {
         match self.state.load(Ordering::Relaxed) {
-            SOME => self.as_mut().expect("is guaranteed to be some"),
+            SOME => self.exclusive_as_mut().expect("is guaranteed to be some"),
             NONE => {
-                self.state.store(WRITING, Ordering::Relaxed);
+                self.state.store(RESERVED_FOR_READING, Ordering::Relaxed);
                 self.value = MaybeUninit::new(f()).into();
                 self.state.store(SOME, Ordering::Relaxed);
-                self.as_mut().expect("is guaranteed to be some")
+                self.exclusive_as_mut().expect("is guaranteed to be some")
             }
             _ => panic!(
                 "ConcurrentOption `get_or_insert_with` is called while its value is being written."
@@ -434,7 +434,7 @@ impl<T> ConcurrentOption<T> {
     /// x.expect("fruits are healthy"); // panics with `fruits are healthy`
     /// ```
     pub fn expect(mut self, msg: &str) -> T {
-        self.take().expect(msg)
+        self.exclusive_take().expect(msg)
     }
 
     /// Returns the contained Some value, consuming the `self` value.
@@ -482,7 +482,7 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(ConcurrentOption::none().unwrap_or("bike"), "bike");
     /// ```
     pub fn unwrap_or(mut self, default: T) -> T {
-        self.take().unwrap_or(default)
+        self.exclusive_take().unwrap_or(default)
     }
 
     /// Returns the contained Some value or a default.
@@ -506,7 +506,7 @@ impl<T> ConcurrentOption<T> {
     where
         T: Default,
     {
-        self.take().unwrap_or_default()
+        self.exclusive_take().unwrap_or_default()
     }
 
     /// Returns the contained Some value or computes it from a closure.
@@ -524,7 +524,7 @@ impl<T> ConcurrentOption<T> {
     where
         F: FnOnce() -> T,
     {
-        self.take().unwrap_or_else(f)
+        self.exclusive_take().unwrap_or_else(f)
     }
 
     /// Returns the contained Some value, consuming the `self` value,
@@ -587,7 +587,7 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(x.and(y), None);
     /// ```
     pub fn and<U>(mut self, other: impl IntoOption<U>) -> Option<U> {
-        self.take().and(other.into_option())
+        self.exclusive_take().and(other.into_option())
     }
 
     /// Returns None if the option is None, otherwise calls `f` with the
@@ -628,7 +628,7 @@ impl<T> ConcurrentOption<T> {
         V: IntoOption<U>,
         F: FnOnce(T) -> V,
     {
-        self.take().and_then(|x| f(x).into_option())
+        self.exclusive_take().and_then(|x| f(x).into_option())
     }
 
     /// Returns None if the option is None, otherwise calls `predicate`
@@ -659,7 +659,7 @@ impl<T> ConcurrentOption<T> {
     where
         P: FnOnce(&T) -> bool,
     {
-        self.take().and_then(|x| match predicate(&x) {
+        self.exclusive_take().and_then(|x| match predicate(&x) {
             true => Some(x),
             false => None,
         })
@@ -682,7 +682,7 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(x.is_some_and(|x| x > 1), false);
     /// ```
     pub fn is_some_and(mut self, f: impl FnOnce(T) -> bool) -> bool {
-        match self.take() {
+        match self.exclusive_take() {
             None => false,
             Some(x) => f(x),
         }
@@ -712,7 +712,7 @@ impl<T> ConcurrentOption<T> {
     where
         F: FnOnce(T) -> U,
     {
-        self.take().map(f)
+        self.exclusive_take().map(f)
     }
 
     /// Returns the provided default result (if none),
@@ -739,7 +739,7 @@ impl<T> ConcurrentOption<T> {
     where
         F: FnOnce(T) -> U,
     {
-        self.take().map_or(default, f)
+        self.exclusive_take().map_or(default, f)
     }
 
     /// Computes a default function result (if none), or
@@ -763,7 +763,7 @@ impl<T> ConcurrentOption<T> {
         D: FnOnce() -> U,
         F: FnOnce(T) -> U,
     {
-        self.take().map_or_else(default, f)
+        self.exclusive_take().map_or_else(default, f)
     }
 
     /// Transforms the `ConcurrentOption<T>` into a [`Result<T, E>`], mapping Some(v) to
@@ -789,7 +789,7 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(x.ok_or(0), Err(0));
     /// ```
     pub fn ok_or<E>(mut self, err: E) -> Result<T, E> {
-        self.take().ok_or(err)
+        self.exclusive_take().ok_or(err)
     }
 
     /// Transforms the `Option<T>` into a [`Result<T, E>`], mapping `Some(v)` to
@@ -813,7 +813,7 @@ impl<T> ConcurrentOption<T> {
     where
         F: FnOnce() -> E,
     {
-        self.take().ok_or_else(err)
+        self.exclusive_take().ok_or_else(err)
     }
 
     /// Returns the option if it contains a value, otherwise returns `other`.
@@ -846,7 +846,7 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(x.or(y), None);
     /// ```
     pub fn or(mut self, other: impl IntoOption<T>) -> Option<T> {
-        self.take().or(other.into_option())
+        self.exclusive_take().or(other.into_option())
     }
 
     /// Returns the option if it contains a value, otherwise calls `f` and
@@ -869,7 +869,7 @@ impl<T> ConcurrentOption<T> {
         O: IntoOption<T>,
         F: FnOnce() -> O,
     {
-        self.take().or_else(|| f().into_option())
+        self.exclusive_take().or_else(|| f().into_option())
     }
 
     /// Returns `Some` if exactly one of `self`, `other` is `Some`, otherwise returns `None`.
@@ -896,7 +896,7 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(x.xor(y), None);
     /// ```
     pub fn xor(mut self, other: impl IntoOption<T>) -> Option<T> {
-        self.take().xor(other.into_option())
+        self.exclusive_take().xor(other.into_option())
     }
 
     /// Zips `self` with another option (`Option` or `ConcurrentOption`).
@@ -917,7 +917,7 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(x.zip(z), None);
     /// ```
     pub fn zip<U>(mut self, other: impl IntoOption<U>) -> Option<(T, U)> {
-        match (self.take(), other.into_option().take()) {
+        match (self.exclusive_take(), other.into_option().take()) {
             (Some(x), Some(y)) => Some((x, y)),
             _ => None,
         }
@@ -936,7 +936,7 @@ impl<T> ConcurrentOption<&T> {
     ///
     /// let x = 12;
     /// let opt_x = ConcurrentOption::some(&x);
-    /// assert_eq!(opt_x.as_ref(Ordering::Relaxed), Some(&&12));
+    /// assert_eq!(opt_x.as_ref_with_order(Ordering::Relaxed), Some(&&12));
     ///
     /// let cloned = opt_x.cloned();
     /// assert_eq!(cloned, Some(12));
@@ -945,7 +945,7 @@ impl<T> ConcurrentOption<&T> {
     where
         T: Clone,
     {
-        self.take().cloned()
+        self.exclusive_take().cloned()
     }
 
     /// Maps an `ConcurrentOption<&T>` to an `Option<T>` by copying the contents of the
@@ -959,7 +959,7 @@ impl<T> ConcurrentOption<&T> {
     ///
     /// let x = 12;
     /// let opt_x = ConcurrentOption::some(&x);
-    /// assert_eq!(opt_x.as_ref(Ordering::Relaxed), Some(&&12));
+    /// assert_eq!(opt_x.as_ref_with_order(Ordering::Relaxed), Some(&&12));
     ///
     /// let copied = opt_x.copied();
     /// assert_eq!(copied, Some(12));
@@ -968,7 +968,7 @@ impl<T> ConcurrentOption<&T> {
     where
         T: Copy,
     {
-        self.take().copied()
+        self.exclusive_take().copied()
     }
 }
 
@@ -992,7 +992,7 @@ impl<T> ConcurrentOption<ConcurrentOption<T>> {
     /// assert_eq!(None, x.flatten());
     /// ```
     pub fn flatten(mut self) -> Option<T> {
-        self.take().and_then(|mut x| x.take())
+        self.exclusive_take().and_then(|mut x| x.exclusive_take())
     }
 }
 
@@ -1016,7 +1016,7 @@ impl<T> ConcurrentOption<Option<T>> {
     /// assert_eq!(None, x.flatten());
     /// ```
     pub fn flatten(mut self) -> Option<T> {
-        self.take().and_then(|x| x)
+        self.exclusive_take().and_then(|x| x)
     }
 }
 
@@ -1038,7 +1038,7 @@ impl<T, U> ConcurrentOption<(T, U)> {
     /// assert_eq!(y.unzip(), (None, None));
     /// ```
     pub fn unzip(mut self) -> (Option<T>, Option<U>) {
-        match self.take() {
+        match self.exclusive_take() {
             Some((x, y)) => (Some(x), Some(y)),
             None => (None, None),
         }

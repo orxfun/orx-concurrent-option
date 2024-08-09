@@ -58,7 +58,7 @@ use std::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::AtomicU8};
 ///     for _ in 0..100 {
 ///         std::thread::sleep(std::time::Duration::from_millis(100));
 ///
-///         let read = maybe.as_ref(Ordering::Acquire);
+///         let read = maybe.as_ref_with_order(Ordering::Acquire);
 ///         let is_none = read.is_none();
 ///         let is_seven = read == Some(&7.to_string());
 ///
@@ -101,7 +101,7 @@ use std::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::AtomicU8};
 ///     }
 /// });
 ///
-/// assert_eq!(maybe.as_ref(Ordering::Relaxed), Some(&7.to_string()));
+/// assert_eq!(maybe.as_ref_with_order(Ordering::Relaxed), Some(&7.to_string()));
 /// ```
 pub struct ConcurrentOption<T> {
     pub(crate) value: UnsafeCell<MaybeUninit<T>>,

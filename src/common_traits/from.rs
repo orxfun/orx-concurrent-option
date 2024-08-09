@@ -12,7 +12,7 @@ impl<T> From<T> for ConcurrentOption<T> {
     /// use std::sync::atomic::Ordering;
     ///
     /// let x: ConcurrentOption<String> = 3.to_string().into();
-    /// assert_eq!(x.as_ref(Ordering::Relaxed), Some(&3.to_string()));
+    /// assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
     /// ```
     fn from(value: T) -> Self {
         ConcurrentOption::some(value)
@@ -29,10 +29,10 @@ impl<T> From<Option<T>> for ConcurrentOption<T> {
     /// use std::sync::atomic::Ordering;
     ///
     /// let x: ConcurrentOption<String> = Some(3.to_string()).into();
-    /// assert_eq!(x.as_ref(Ordering::Relaxed), Some(&3.to_string()));
+    /// assert_eq!(x.as_ref_with_order(Ordering::Relaxed), Some(&3.to_string()));
     ///
     /// let x: ConcurrentOption<String> = None.into();
-    /// assert_eq!(x.as_ref(Ordering::Relaxed), None);
+    /// assert_eq!(x.as_ref_with_order(Ordering::Relaxed), None);
     /// ```
     fn from(value: Option<T>) -> Self {
         match value {
@@ -62,6 +62,6 @@ impl<T> From<ConcurrentOption<T>> for Option<T> {
     /// assert_eq!(y, None);
     /// ```
     fn from(mut value: ConcurrentOption<T>) -> Self {
-        value.take()
+        value.exclusive_take()
     }
 }

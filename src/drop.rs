@@ -1,6 +1,6 @@
 use crate::{
     concurrent_option::ConcurrentOption,
-    states::{SOME, WRITING},
+    states::{RESERVED_FOR_READING, SOME},
 };
 use std::sync::atomic::Ordering;
 
@@ -11,7 +11,9 @@ impl<T> Drop for ConcurrentOption<T> {
                 let x = unsafe { &mut *self.value.get() };
                 unsafe { x.assume_init_drop() };
             }
-            WRITING => panic!("ConcurrentOption is dropped while its value is being written."),
+            RESERVED_FOR_READING => {
+                panic!("ConcurrentOption is dropped while its value is being written.")
+            }
             _ => {}
         }
     }

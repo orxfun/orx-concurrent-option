@@ -2,7 +2,7 @@ use orx_concurrent_option::*;
 use std::sync::atomic::Ordering;
 
 #[test]
-fn iter_when_none() {
+fn iter_with_order_when_none() {
     fn validate<'a>(mut iter: impl ExactSizeIterator<Item = &'a String>) {
         assert_eq!(iter.len(), 0);
         assert!(iter.next().is_none());
@@ -10,8 +10,8 @@ fn iter_when_none() {
     }
 
     let x = ConcurrentOption::<String>::none();
-    validate(x.iter(Ordering::Relaxed));
-    validate(x.iter(Ordering::Relaxed).rev());
+    validate(x.iter_with_order(Ordering::Relaxed));
+    validate(x.iter_with_order(Ordering::Relaxed).rev());
     validate((&x).into_iter());
 
     fn validate_value(mut iter: impl ExactSizeIterator<Item = String>) {
@@ -21,13 +21,13 @@ fn iter_when_none() {
     }
 
     let x = ConcurrentOption::<String>::none();
-    validate_value(x.iter(Ordering::Acquire).cloned());
-    validate_value(x.iter(Ordering::SeqCst).rev().cloned());
+    validate_value(x.iter_with_order(Ordering::Acquire).cloned());
+    validate_value(x.iter_with_order(Ordering::SeqCst).rev().cloned());
     validate_value(x.into_iter());
 }
 
 #[test]
-fn iter_when_some() {
+fn exclusive_iter_when_some() {
     fn validate<'a>(mut iter: impl ExactSizeIterator<Item = &'a String>) {
         assert_eq!(iter.len(), 1);
         assert_eq!(iter.next(), Some(&3.to_string()));
@@ -37,8 +37,8 @@ fn iter_when_some() {
     }
 
     let x = ConcurrentOption::some(3.to_string());
-    validate(x.iter(Ordering::Relaxed));
-    validate(x.iter(Ordering::Relaxed).rev());
+    validate(x.iter_with_order(Ordering::Relaxed));
+    validate(x.iter_with_order(Ordering::Relaxed).rev());
     validate((&x).into_iter());
 
     fn validate_value(mut iter: impl ExactSizeIterator<Item = String>) {
@@ -50,7 +50,7 @@ fn iter_when_some() {
     }
 
     let x = ConcurrentOption::some(3.to_string());
-    validate_value(x.iter(Ordering::Relaxed).cloned());
-    validate_value(x.iter(Ordering::SeqCst).rev().cloned());
+    validate_value(x.iter_with_order(Ordering::Relaxed).cloned());
+    validate_value(x.iter_with_order(Ordering::SeqCst).rev().cloned());
     validate_value(x.into_iter());
 }

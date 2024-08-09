@@ -833,29 +833,6 @@ impl<T> ConcurrentOption<T> {
         })
     }
 
-    /// Returns `true` if the option is a Some and the value inside of it matches a predicate.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use orx_concurrent_option::*;
-    ///
-    /// let x = ConcurrentOption::some(2);
-    /// assert_eq!(x.is_some_and(|x| x > 1), true);
-    ///
-    /// let x = ConcurrentOption::some(0);
-    /// assert_eq!(x.is_some_and(|x| x > 1), false);
-    ///
-    /// let x: ConcurrentOption<i32> = ConcurrentOption::none();
-    /// assert_eq!(x.is_some_and(|x| x > 1), false);
-    /// ```
-    pub fn is_some_and(mut self, f: impl FnOnce(T) -> bool) -> bool {
-        match self.exclusive_take() {
-            None => false,
-            Some(x) => f(x),
-        }
-    }
-
     /// Maps an `ConcurrentOption<T>` to `Option<U>` by applying a function to a contained value (if `Some`) or returns `None` (if `None`).
     ///
     /// # Examples

@@ -1,13 +1,10 @@
-use crate::concurrent_option::ConcurrentOption;
-use std::sync::atomic::Ordering;
+use crate::{concurrent_option::ConcurrentOption, states::ORDER_LOAD};
 
 impl<T: PartialEq> PartialEq for ConcurrentOption<T> {
-    /// Returns whether or not self is equal to the `other` the [`Relaxed`] ordering.
+    /// Returns whether or not self is equal to the `other` with the default ordering.
     ///
-    /// In order to compare with a stronger ordering,
-    /// you may call [`eq_with_order`] with the desired ordering.
+    /// You may call [`eq_with_order`] to use the desired ordering.
     ///
-    /// [`Relaxed`]: std::sync::atomic::Ordering::Relaxed
     /// [`eq_with_order`]: ConcurrentOption::eq_with_order
     ///
     /// ```rust
@@ -26,7 +23,7 @@ impl<T: PartialEq> PartialEq for ConcurrentOption<T> {
     /// assert!(z.eq(&z));
     /// ```
     fn eq(&self, other: &Self) -> bool {
-        self.eq_with_order(other, Ordering::Relaxed)
+        self.eq_with_order(other, ORDER_LOAD)
     }
 }
 

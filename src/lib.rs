@@ -51,7 +51,7 @@
 //!
 //! ConcurrentOption also exposes methods which accepts a `std::sync::atomic::Ordering` and gives the control to the caller. These methods are suffixed with **with_order**, except for the state.
 //!
-//! Some such methods are `state`, `as_ref_with_order`, `raw_get_with_order`, `clone_with_order`, etc.
+//! Some such methods are `state`, `as_ref_with_order`, `get_raw_with_order`, `clone_with_order`, etc.
 //!
 //! ## Examples
 //!

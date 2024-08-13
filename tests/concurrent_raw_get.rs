@@ -7,7 +7,7 @@ use test_case::test_matrix;
     [false, true],
     [Ordering::SeqCst, Ordering::Acquire]
 )]
-fn concurrent_raw_get_single_writer(num_readers: usize, do_sleep: bool, read_order: Ordering) {
+fn concurrent_get_raw_single_writer(num_readers: usize, do_sleep: bool, read_order: Ordering) {
     let maybe = ConcurrentOption::<String>::none();
     let maybe_ref = &maybe;
 
@@ -30,7 +30,7 @@ fn concurrent_raw_get_single_writer(num_readers: usize, do_sleep: bool, read_ord
     [false, true],
     [Ordering::SeqCst, Ordering::Acquire]
 )]
-fn concurrent_raw_get_multiple_writer(
+fn concurrent_get_raw_multiple_writer(
     num_writers: usize,
     num_readers: usize,
     do_sleep: bool,
@@ -64,7 +64,7 @@ fn read(do_sleep: bool, maybe_ref: &ConcurrentOption<String>, read_order: Orderi
                 let read = unsafe { p.as_ref() }.unwrap();
                 assert_eq!(read, &7.to_string());
             }
-            None => ptr = maybe_ref.raw_get_with_order(read_order),
+            None => ptr = maybe_ref.get_raw_with_order(read_order),
         }
     }
 }

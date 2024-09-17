@@ -49,7 +49,7 @@ Some example methods are `as_ref`, `as_deref`, `insert`, etc.
 
 ### ⬤ Methods to allow manual control on concurrency
 
-ConcurrentOption also exposes methods which accepts a `std::sync::atomic::Ordering` and gives the control to the caller. These methods are suffixed with **with_order**, except for the state.
+ConcurrentOption also exposes methods which accepts a `core::sync::atomic::Ordering` and gives the control to the caller. These methods are suffixed with **with_order**, except for the state.
 
 Some such methods are `state`, `as_ref_with_order`, `get_raw_with_order`, `clone_with_order`, etc.
 

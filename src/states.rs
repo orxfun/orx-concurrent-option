@@ -1,11 +1,13 @@
-use std::sync::atomic::Ordering;
+use core::sync::atomic::Ordering;
 
-pub(crate) const ORDER_LOAD: Ordering = Ordering::Acquire;
-pub(crate) const ORDER_STORE: Ordering = Ordering::SeqCst;
+pub type StateInner = u8;
 
-pub(crate) const NONE: u8 = 0;
-pub(crate) const RESERVED: u8 = 1;
-pub(crate) const SOME: u8 = 2;
+pub const ORDER_LOAD: Ordering = Ordering::Acquire;
+pub const ORDER_STORE: Ordering = Ordering::SeqCst;
+
+pub const NONE: StateInner = 0;
+pub const RESERVED: StateInner = 1;
+pub const SOME: StateInner = 2;
 
 /// Concurrent state of the optional.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -20,7 +22,7 @@ pub enum State {
 
 impl State {
     #[allow(clippy::panic, clippy::missing_panics_doc)]
-    pub(crate) fn new(state: u8) -> Self {
+    pub(crate) fn new(state: StateInner) -> Self {
         match state {
             NONE => Self::None,
             SOME => Self::Some,

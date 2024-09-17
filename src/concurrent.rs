@@ -1,5 +1,5 @@
 use crate::{states::*, ConcurrentOption};
-use std::mem::MaybeUninit;
+use core::mem::MaybeUninit;
 
 impl<T> ConcurrentOption<T> {
     // concurrent state mutation - special
@@ -144,7 +144,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
+    /// use core::sync::atomic::Ordering;
     ///
     /// let x = ConcurrentOption::<String>::none();
     /// unsafe { x.initialize_unchecked(3.to_string()) };
@@ -168,7 +168,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
+    /// use core::sync::atomic::Ordering;
     ///
     /// fn reader(maybe: &ConcurrentOption<String>) {
     ///     let mut is_none_at_least_once = false;
@@ -372,7 +372,7 @@ impl<T> ConcurrentOption<T> {
         loop {
             if let Some(_handle) = self.spin_get_handle(SOME, SOME) {
                 let x = unsafe { (*self.value.get()).assume_init_mut() };
-                let old = std::mem::replace(x, value);
+                let old = core::mem::replace(x, value);
                 return Some(old);
             }
 
@@ -423,7 +423,7 @@ impl<T> ConcurrentOption<T> {
         loop {
             if let Some(_handle) = self.spin_get_handle(SOME, SOME) {
                 let x = unsafe { (*self.value.get()).assume_init_mut() };
-                let _old = std::mem::replace(x, value);
+                let _old = core::mem::replace(x, value);
                 return x;
             }
 

@@ -1,5 +1,5 @@
-use crate::mut_handle::MutHandle;
-use std::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::AtomicU8};
+use crate::{mut_handle::MutHandle, states::StateInner};
+use core::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::AtomicU8};
 
 /// ConcurrentOption is a thread-safe and lock-free read-write option type.
 ///
@@ -47,7 +47,7 @@ use std::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::AtomicU8};
 ///
 /// ### ⬤ Methods to allow manual control on concurrency
 ///
-/// ConcurrentOption also exposes methods which accepts a `std::sync::atomic::Ordering` and gives the control to the caller. These methods are suffixed with **with_order**, except for the state.
+/// ConcurrentOption also exposes methods which accepts a `core::sync::atomic::Ordering` and gives the control to the caller. These methods are suffixed with **with_order**, except for the state.
 ///
 /// Some such methods are `state`, `as_ref_with_order`, `get_raw_with_order`, `clone_with_order`, etc.
 ///
@@ -204,14 +204,18 @@ pub struct ConcurrentOption<T> {
 }
 
 impl<T> ConcurrentOption<T> {
-    pub(crate) fn get_handle(&self, initial_state: u8, success_state: u8) -> Option<MutHandle<'_>> {
+    pub(crate) fn get_handle(
+        &self,
+        initial_state: StateInner,
+        success_state: StateInner,
+    ) -> Option<MutHandle<'_>> {
         MutHandle::get(&self.state, initial_state, success_state)
     }
 
     pub(crate) fn spin_get_handle(
         &self,
-        initial_state: u8,
-        success_state: u8,
+        initial_state: StateInner,
+        success_state: StateInner,
     ) -> Option<MutHandle<'_>> {
         MutHandle::spin_get(&self.state, initial_state, success_state)
     }

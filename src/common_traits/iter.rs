@@ -1,5 +1,5 @@
 use crate::ConcurrentOption;
-use std::{iter::FusedIterator, sync::atomic::Ordering};
+use core::{iter::FusedIterator, sync::atomic::Ordering};
 
 // INTO-ITER
 
@@ -24,7 +24,7 @@ impl<'a, T> IntoIterator for &'a mut ConcurrentOption<T> {
 impl<T> IntoIterator for ConcurrentOption<T> {
     type Item = T;
 
-    type IntoIter = std::option::IntoIter<T>;
+    type IntoIter = core::option::IntoIter<T>;
 
     fn into_iter(mut self) -> Self::IntoIter {
         self.exclusive_take().into_iter()

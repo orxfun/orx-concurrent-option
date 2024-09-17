@@ -1,5 +1,5 @@
 use crate::ConcurrentOption;
-use std::cmp::Ordering::*;
+use core::cmp::Ordering::*;
 
 impl<T: PartialOrd> PartialOrd for ConcurrentOption<T> {
     /// Returns an ordering between `self` and `other` with the default ordering.
@@ -10,7 +10,7 @@ impl<T: PartialOrd> PartialOrd for ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::cmp::Ordering::*;
+    /// use core::cmp::Ordering::*;
     ///
     /// let x = ConcurrentOption::some(3);
     /// let y = ConcurrentOption::some(7);
@@ -28,7 +28,7 @@ impl<T: PartialOrd> PartialOrd for ConcurrentOption<T> {
     /// assert_eq!(z.partial_cmp(&y), Some(Less));
     /// assert_eq!(z.partial_cmp(&z), Some(Equal));
     /// ```
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         match unsafe { (self.as_ref(), other.as_ref()) } {
             (Some(l), Some(r)) => l.partial_cmp(r),
             (Some(_), None) => Some(Greater),
@@ -47,7 +47,7 @@ impl<T: Ord> Ord for ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::cmp::Ordering::*;
+    /// use core::cmp::Ordering::*;
     ///
     /// let x = ConcurrentOption::some(3);
     /// let y = ConcurrentOption::some(7);
@@ -65,7 +65,7 @@ impl<T: Ord> Ord for ConcurrentOption<T> {
     /// assert_eq!(z.cmp(&y), Less);
     /// assert_eq!(z.cmp(&z), Equal);
     /// ```
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         match unsafe { (self.as_ref(), other.as_ref()) } {
             (Some(l), Some(r)) => l.cmp(r),
             (Some(_), None) => Greater,

@@ -1,5 +1,5 @@
 use crate::{concurrent_option::ConcurrentOption, states::*};
-use std::sync::atomic::Ordering;
+use core::sync::atomic::Ordering;
 
 impl<T> ConcurrentOption<T> {
     /// Returns the contained Some value, consuming the `self` value.

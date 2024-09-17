@@ -1,12 +1,12 @@
 use crate::concurrent_option::ConcurrentOption;
-use std::fmt::Debug;
+use core::fmt::Debug;
 
 impl<T: Debug> Debug for ConcurrentOption<T> {
     /// Creates the debug representation.
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
+    /// use core::sync::atomic::Ordering;
     ///
     /// let x = ConcurrentOption::some(3.to_string());
     /// let y = format!("{:?}", x); // debug with default Relaxed ordering
@@ -16,7 +16,7 @@ impl<T: Debug> Debug for ConcurrentOption<T> {
     /// let y = format!("{:?}", x);
     /// assert_eq!(y, "ConcurrentNone");
     /// ```
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let maybe = unsafe { self.as_ref() };
         write!(f, "Concurrent{:?}", maybe)
     }

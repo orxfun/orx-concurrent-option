@@ -30,7 +30,7 @@ fn debug() {
 
 #[test]
 fn partial_ord() {
-    use std::cmp::Ordering::*;
+    use core::cmp::Ordering::*;
 
     let x = ConcurrentOption::some(3);
     let y = ConcurrentOption::some(7);
@@ -51,7 +51,7 @@ fn partial_ord() {
 
 #[test]
 fn ord() {
-    use std::cmp::Ordering::*;
+    use core::cmp::Ordering::*;
 
     let x = ConcurrentOption::some(3);
     let y = ConcurrentOption::some(7);

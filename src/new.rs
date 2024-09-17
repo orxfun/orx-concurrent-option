@@ -1,6 +1,6 @@
 use crate::concurrent_option::ConcurrentOption;
 use crate::states::*;
-use std::mem::MaybeUninit;
+use core::mem::MaybeUninit;
 
 impl<T> ConcurrentOption<T> {
     /// Creates a concurrent option of the Some variant with an existing value.

@@ -1,5 +1,5 @@
 use crate::{states::*, ConcurrentOption};
-use std::sync::atomic::Ordering;
+use core::sync::atomic::Ordering;
 
 impl<T> ConcurrentOption<T> {
     // raw
@@ -86,7 +86,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
+    /// use core::sync::atomic::Ordering;
     ///
     /// let x = ConcurrentOption::<String>::none();
     /// let p = x.get_raw_with_order(Ordering::SeqCst);
@@ -115,7 +115,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
+    /// use core::sync::atomic::Ordering;
     ///
     /// let x = ConcurrentOption::<String>::none();
     /// let p = x.get_raw_mut_with_order(Ordering::SeqCst);

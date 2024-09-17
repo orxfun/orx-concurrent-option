@@ -1,15 +1,24 @@
 use crate::states::*;
-use std::sync::atomic::AtomicU8;
+use core::sync::atomic::{AtomicU8, Ordering};
 
 pub(crate) struct MutHandle<'a> {
     state: &'a AtomicU8,
-    success_state: u8,
+    success_state: StateInner,
 }
 
 impl<'a> MutHandle<'a> {
-    pub fn get(state: &'a AtomicU8, initial_state: u8, success_state: u8) -> Option<Self> {
+    pub fn get(
+        state: &'a AtomicU8,
+        initial_state: StateInner,
+        success_state: StateInner,
+    ) -> Option<Self> {
         match state
-            .compare_exchange(initial_state, RESERVED, ORDER_LOAD, ORDER_LOAD)
+            .compare_exchange(
+                initial_state,
+                RESERVED,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            )
             .is_ok()
         {
             true => Some(Self {
@@ -20,9 +29,18 @@ impl<'a> MutHandle<'a> {
         }
     }
 
-    pub fn spin_get(state: &'a AtomicU8, initial_state: u8, success_state: u8) -> Option<Self> {
+    pub fn spin_get(
+        state: &'a AtomicU8,
+        initial_state: StateInner,
+        success_state: StateInner,
+    ) -> Option<Self> {
         loop {
-            match state.compare_exchange(initial_state, RESERVED, ORDER_LOAD, ORDER_LOAD) {
+            match state.compare_exchange(
+                initial_state,
+                RESERVED,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            ) {
                 Ok(_) => {
                     return Some(Self {
                         state,
@@ -41,7 +59,12 @@ impl<'a> MutHandle<'a> {
 impl<'a> Drop for MutHandle<'a> {
     fn drop(&mut self) {
         self.state
-            .compare_exchange(RESERVED, self.success_state, ORDER_STORE, ORDER_STORE)
+            .compare_exchange(
+                RESERVED,
+                self.success_state,
+                Ordering::Release,
+                Ordering::Relaxed,
+            )
             .expect("Failed to update the concurrent state after concurrent state mutation");
     }
 }

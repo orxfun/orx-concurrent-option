@@ -1,5 +1,5 @@
 use crate::{concurrent_option::ConcurrentOption, states::*, IntoOption};
-use std::{mem::MaybeUninit, ops::Deref};
+use core::{mem::MaybeUninit, ops::Deref};
 
 impl<T> ConcurrentOption<T> {
     // &self
@@ -10,7 +10,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// ```
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
+    /// use core::sync::atomic::Ordering;
     ///
     /// let x: ConcurrentOption<u32> = ConcurrentOption::some(2);
     /// assert_eq!(x.is_some(), true);
@@ -426,7 +426,7 @@ impl<T> ConcurrentOption<&T> {
     ///
     /// ```
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
+    /// use core::sync::atomic::Ordering;
     ///
     /// let x = 12;
     /// let opt_x = ConcurrentOption::some(&x);

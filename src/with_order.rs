@@ -1,5 +1,5 @@
 use crate::{states::*, ConcurrentOption};
-use std::{ops::Deref, sync::atomic::Ordering};
+use core::{ops::Deref, sync::atomic::Ordering};
 
 impl<T> ConcurrentOption<T> {
     /// Loads and returns the concurrent state of the option with the given `order`.
@@ -8,7 +8,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// ```
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
+    /// use core::sync::atomic::Ordering;
     ///
     /// let x: ConcurrentOption<u32> = ConcurrentOption::some(2);
     /// assert_eq!(x.state(Ordering::Relaxed), State::Some);
@@ -18,6 +18,43 @@ impl<T> ConcurrentOption<T> {
     /// ```
     pub fn state(&self, order: Ordering) -> State {
         State::new(self.state.load(order))
+    }
+
+    /// Returns `true` if the option is a Some variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use orx_concurrent_option::*;
+    /// use core::sync::atomic::Ordering;
+    ///
+    /// let x: ConcurrentOption<u32> = ConcurrentOption::some(2);
+    /// assert_eq!(x.is_some(), true);
+    ///
+    /// let x: ConcurrentOption<u32> = ConcurrentOption::none();
+    /// assert_eq!(x.is_some(), false);
+    /// ```
+    #[inline]
+    pub fn is_some_with_order(&self, order: Ordering) -> bool {
+        self.state.load(order) == SOME
+    }
+
+    /// Returns `true` if the option is a None variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use orx_concurrent_option::*;
+    ///
+    /// let x: ConcurrentOption<u32> = ConcurrentOption::some(2);
+    /// assert_eq!(x.is_none(), false);
+    ///
+    /// let x: ConcurrentOption<u32> = ConcurrentOption::none();
+    /// assert_eq!(x.is_none(), true);
+    /// ```
+    #[inline]
+    pub fn is_none_with_order(&self, order: Ordering) -> bool {
+        self.state.load(order) != SOME
     }
 
     /// Converts from `&Option<T>` to `Option<&T>`.
@@ -42,7 +79,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
+    /// use core::sync::atomic::Ordering;
     ///
     /// let x = ConcurrentOption::some(3.to_string());
     /// assert_eq!(unsafe { x.as_ref_with_order(Ordering::Relaxed) }, Some(&3.to_string()));
@@ -85,7 +122,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
+    /// use core::sync::atomic::Ordering;
     ///
     /// unsafe
     /// {
@@ -133,7 +170,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
+    /// use core::sync::atomic::Ordering;
     ///
     /// fn validate<'a>(mut iter: impl ExactSizeIterator<Item = &'a String>) {
     ///     assert_eq!(iter.len(), 0);
@@ -162,7 +199,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
+    /// use core::sync::atomic::Ordering;
     ///
     /// let mut x = ConcurrentOption::some(42);
     /// let y = x.clone_with_order(Ordering::SeqCst);
@@ -183,7 +220,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::sync::atomic::Ordering;
+    /// use core::sync::atomic::Ordering;
     ///
     /// let x = ConcurrentOption::some(3);
     /// let y = ConcurrentOption::some(7);
@@ -220,13 +257,13 @@ impl<T> ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::cmp::Ordering::*;
+    /// use core::cmp::Ordering::*;
     ///
     /// let x = ConcurrentOption::some(3);
     /// let y = ConcurrentOption::some(7);
     /// let z = ConcurrentOption::<i32>::none();
     ///
-    /// let ord = std::sync::atomic::Ordering::SeqCst;
+    /// let ord = core::sync::atomic::Ordering::SeqCst;
     ///
     /// assert_eq!(x.partial_cmp_with_order(&x, ord), Some(Equal));
     /// assert_eq!(x.partial_cmp_with_order(&y, ord), Some(Less));
@@ -244,11 +281,11 @@ impl<T> ConcurrentOption<T> {
         &self,
         other: &Self,
         order: Ordering,
-    ) -> Option<std::cmp::Ordering>
+    ) -> Option<core::cmp::Ordering>
     where
         T: PartialOrd,
     {
-        use std::cmp::Ordering::*;
+        use core::cmp::Ordering::*;
 
         match (unsafe { self.as_ref_with_order(order) }, unsafe {
             other.as_ref_with_order(order)
@@ -268,13 +305,13 @@ impl<T> ConcurrentOption<T> {
     ///
     /// ```rust
     /// use orx_concurrent_option::*;
-    /// use std::cmp::Ordering::*;
+    /// use core::cmp::Ordering::*;
     ///
     /// let x = ConcurrentOption::some(3);
     /// let y = ConcurrentOption::some(7);
     /// let z = ConcurrentOption::<i32>::none();
     ///
-    /// let ord = std::sync::atomic::Ordering::SeqCst;
+    /// let ord = core::sync::atomic::Ordering::SeqCst;
     ///
     /// assert_eq!(x.cmp_with_order(&x, ord), Equal);
     /// assert_eq!(x.cmp_with_order(&y, ord), Less);
@@ -288,11 +325,11 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(z.cmp_with_order(&y, ord), Less);
     /// assert_eq!(z.cmp_with_order(&z, ord), Equal);
     /// ```
-    pub fn cmp_with_order(&self, other: &Self, order: Ordering) -> std::cmp::Ordering
+    pub fn cmp_with_order(&self, other: &Self, order: Ordering) -> core::cmp::Ordering
     where
         T: Ord,
     {
-        use std::cmp::Ordering::*;
+        use core::cmp::Ordering::*;
 
         match (unsafe { self.as_ref_with_order(order) }, unsafe {
             other.as_ref_with_order(order)

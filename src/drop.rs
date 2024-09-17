@@ -2,7 +2,7 @@ use crate::{
     concurrent_option::ConcurrentOption,
     states::{RESERVED, SOME},
 };
-use std::sync::atomic::Ordering;
+use core::sync::atomic::Ordering;
 
 impl<T> Drop for ConcurrentOption<T> {
     #[allow(clippy::panic)]

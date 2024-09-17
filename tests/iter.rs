@@ -1,5 +1,5 @@
+use core::sync::atomic::Ordering;
 use orx_concurrent_option::*;
-use std::sync::atomic::Ordering;
 
 #[test]
 fn iter_with_order_when_none() {

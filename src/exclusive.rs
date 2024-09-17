@@ -1,5 +1,5 @@
 use crate::{states::*, ConcurrentOption};
-use std::{
+use core::{
     mem::MaybeUninit,
     ops::{Deref, DerefMut},
     sync::atomic::Ordering,
@@ -68,8 +68,8 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(y, None);
     /// ```
     pub fn exclusive_take(&mut self) -> Option<T> {
-        match self.state(Ordering::Relaxed) {
-            State::Some => {
+        match self.state.load(Ordering::Relaxed) {
+            SOME => {
                 self.state.store(NONE, Ordering::Relaxed);
                 let x = unsafe { &mut *self.value.get() };
                 Some(unsafe { x.assume_init_read() })
@@ -163,7 +163,7 @@ impl<T> ConcurrentOption<T> {
             SOME => {
                 self.state.store(RESERVED, Ordering::Relaxed);
                 let x = unsafe { (*self.value.get()).assume_init_mut() };
-                let old = std::mem::replace(x, value);
+                let old = core::mem::replace(x, value);
                 self.state.store(SOME, Ordering::Relaxed);
                 Some(old)
             }
@@ -206,7 +206,7 @@ impl<T> ConcurrentOption<T> {
             SOME => {
                 self.state.store(RESERVED, Ordering::Relaxed);
                 let x = unsafe { (*self.value.get()).assume_init_mut() };
-                let _ = std::mem::replace(x, value);
+                let _ = core::mem::replace(x, value);
                 self.state.store(SOME, Ordering::Relaxed);
             }
             NONE => {

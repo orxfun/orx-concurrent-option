@@ -1,13 +1,17 @@
 use core::sync::atomic::Ordering;
 
-pub type StateInner = u8;
+/// State represented as u8.
+pub type StateU8 = u8;
 
 pub const ORDER_LOAD: Ordering = Ordering::Acquire;
 pub const ORDER_STORE: Ordering = Ordering::SeqCst;
 
-pub const NONE: StateInner = 0;
-pub const RESERVED: StateInner = 1;
-pub const SOME: StateInner = 2;
+/// State where the optional does not have a value.
+pub const NONE: StateU8 = 0;
+/// State where the optional's value is being transitioned.
+pub const RESERVED: StateU8 = 1;
+/// State where the optional contains a value.
+pub const SOME: StateU8 = 2;
 
 /// Concurrent state of the optional.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,7 +26,7 @@ pub enum State {
 
 impl State {
     #[allow(clippy::panic, clippy::missing_panics_doc)]
-    pub(crate) fn new(state: StateInner) -> Self {
+    pub(crate) fn new(state: StateU8) -> Self {
         match state {
             NONE => Self::None,
             SOME => Self::Some,

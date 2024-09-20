@@ -1,4 +1,4 @@
-use crate::{mut_handle::MutHandle, states::StateInner};
+use crate::{handle::Handle, mut_handle::MutHandle, states::StateU8};
 use core::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::AtomicU8};
 
 /// ConcurrentOption is a thread-safe and lock-free read-write option type.
@@ -206,18 +206,35 @@ pub struct ConcurrentOption<T> {
 impl<T> ConcurrentOption<T> {
     pub(crate) fn get_handle(
         &self,
-        initial_state: StateInner,
-        success_state: StateInner,
-    ) -> Option<MutHandle<'_>> {
-        MutHandle::get(&self.state, initial_state, success_state)
+        initial_state: StateU8,
+        success_state: StateU8,
+    ) -> Option<Handle<'_>> {
+        Handle::get(&self.state, initial_state, success_state)
     }
 
+    #[inline(always)]
     pub(crate) fn spin_get_handle(
         &self,
-        initial_state: StateInner,
-        success_state: StateInner,
-    ) -> Option<MutHandle<'_>> {
-        MutHandle::spin_get(&self.state, initial_state, success_state)
+        initial_state: StateU8,
+        success_state: StateU8,
+    ) -> Option<Handle<'_>> {
+        Handle::spin_get(&self.state, initial_state, success_state)
+    }
+
+    /// Provides the mut handle on the value of the optional:
+    /// * the optional must be in the `initial_state` for this method to succeed,
+    /// * the optional will be brought to `success_state` once the handle is dropped.
+    ///
+    /// # Safety
+    ///
+    /// This method is unsafe since the handle provides direct access to the underlying
+    /// value, skipping thread-safety guarantees.
+    pub unsafe fn mut_handle(
+        &self,
+        initial_state: StateU8,
+        success_state: StateU8,
+    ) -> Option<MutHandle<T>> {
+        MutHandle::spin_get(self, initial_state, success_state)
     }
 }
 

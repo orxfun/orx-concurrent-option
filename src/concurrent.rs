@@ -1,5 +1,5 @@
 use crate::{states::*, ConcurrentOption};
-use core::mem::MaybeUninit;
+use core::{mem::MaybeUninit, sync::atomic::Ordering};
 
 impl<T> ConcurrentOption<T> {
     // concurrent state mutation - special
@@ -218,13 +218,14 @@ impl<T> ConcurrentOption<T> {
     /// ```
     pub unsafe fn initialize_unchecked(&self, value: T) {
         unsafe { &mut *self.value.get() }.write(value);
-        self.state.store(SOME, ORDER_STORE);
+        self.state.store(SOME, Ordering::Release);
     }
 
     // concurrent state mutation
 
     /// Thread safe method to update the value of the option if it is of Some variant.
     /// Does nothing if it is None.
+    /// Returns whether or not the value is updated.
     ///
     /// # Example
     ///
@@ -232,12 +233,14 @@ impl<T> ConcurrentOption<T> {
     /// use orx_concurrent_option::*;
     ///
     /// let maybe = ConcurrentOption::<String>::none();
-    /// maybe.update_if_some(|x| *x = format!("{}!", x));
+    /// let updated = maybe.update_if_some(|x| *x = format!("{}!", x));
     /// assert!(maybe.is_none());
+    /// assert_eq!(updated, false);
     ///
     /// let maybe = ConcurrentOption::some(42.to_string());
-    /// maybe.update_if_some(|x| *x = format!("{}!", x));
+    /// let updated = maybe.update_if_some(|x| *x = format!("{}!", x));
     /// assert!(maybe.is_some_and(|x| x == &"42!".to_string()));
+    /// assert_eq!(updated, true);
     /// ```
     pub fn update_if_some<F>(&self, mut f: F) -> bool
     where
@@ -245,14 +248,12 @@ impl<T> ConcurrentOption<T> {
     {
         match self.spin_get_handle(SOME, SOME) {
             Some(_handle) => {
-                let x = unsafe { &mut *self.value.get() };
-                let x = unsafe { MaybeUninit::assume_init_mut(x) };
+                let x = unsafe { MaybeUninit::assume_init_mut(&mut *self.value.get()) };
                 f(x);
                 true
             }
             None => false,
-        };
-        true
+        }
     }
 
     /// Thread safe method to take the value out of the option if Some,
@@ -384,6 +385,23 @@ impl<T> ConcurrentOption<T> {
         }
     }
 
+    /// true if updated; false if initiated
+    pub fn set_some(&self, value: T) -> bool {
+        loop {
+            if let Some(_handle) = self.spin_get_handle(SOME, SOME) {
+                let x = unsafe { (*self.value.get()).assume_init_mut() };
+                let _old = core::mem::replace(x, value);
+                return true;
+            }
+
+            if let Some(_handle) = self.spin_get_handle(NONE, SOME) {
+                let x = unsafe { &mut *self.value.get() };
+                x.write(value);
+                return false;
+            }
+        }
+    }
+
     /// Partially thread safe method to insert `value` into the option, and then to return a mutable reference to it.
     ///
     /// If the option already contains a value, the old value is dropped.
@@ -470,7 +488,17 @@ impl<T> ConcurrentOption<T> {
     /// ```
     #[allow(clippy::mut_from_ref)]
     pub unsafe fn get_or_insert(&self, value: T) -> &mut T {
-        self.get_or_insert_with(|| value)
+        loop {
+            if let Some(_handle) = self.spin_get_handle(SOME, SOME) {
+                return unsafe { (*self.value.get()).assume_init_mut() };
+            }
+
+            if let Some(_handle) = self.spin_get_handle(NONE, SOME) {
+                let x = unsafe { &mut *self.value.get() };
+                x.write(value);
+                return unsafe { x.assume_init_mut() };
+            }
+        }
     }
 
     /// Partially thread safe method to insert a value computed from `f` into the option if it is None,

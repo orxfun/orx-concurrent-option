@@ -1,4 +1,5 @@
 use crate::{concurrent_option::ConcurrentOption, states::*, IntoOption};
+use core::sync::atomic::Ordering;
 use core::{mem::MaybeUninit, ops::Deref};
 
 impl<T> ConcurrentOption<T> {
@@ -20,7 +21,7 @@ impl<T> ConcurrentOption<T> {
     /// ```
     #[inline]
     pub fn is_some(&self) -> bool {
-        self.state.load(ORDER_LOAD) == SOME
+        self.state.load(Ordering::Relaxed) == SOME
     }
 
     /// Returns `true` if the option is a None variant.
@@ -38,7 +39,7 @@ impl<T> ConcurrentOption<T> {
     /// ```
     #[inline]
     pub fn is_none(&self) -> bool {
-        self.state.load(ORDER_LOAD) != SOME
+        self.state.load(Ordering::Relaxed) != SOME
     }
 
     /// Partially thread safe method to convert from `&Option<T>` to `Option<&T>`.
@@ -161,6 +162,33 @@ impl<T> ConcurrentOption<T> {
         }
     }
 
+    /// Clones the value of the `ConcurrentOption<T>` into a `Some` of `T`
+    /// if the concurrent option is some; returns None otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use orx_concurrent_option::*;
+    ///
+    /// let opt = ConcurrentOption::some(12);
+    /// assert_eq!(unsafe { opt.as_ref() }, Some(&12));
+    ///
+    /// let clone = opt.clone_into_option();
+    /// assert_eq!(clone, Some(12));
+    /// ```
+    pub fn clone_into_option(&self) -> Option<T>
+    where
+        T: Clone,
+    {
+        match self.spin_get_handle(SOME, SOME) {
+            Some(_handle) => {
+                let x = unsafe { &*self.value.get() };
+                Some(unsafe { x.assume_init_ref().clone() })
+            }
+            None => None,
+        }
+    }
+
     /// Thread safe method to map the reference of the underlying value with the given function `f`.
     ///
     /// Returns
@@ -199,8 +227,7 @@ impl<T> ConcurrentOption<T> {
     {
         match self.spin_get_handle(SOME, SOME) {
             Some(_handle) => {
-                let x = unsafe { &*self.value.get() };
-                let x = unsafe { MaybeUninit::assume_init_ref(x) };
+                let x = unsafe { MaybeUninit::assume_init_ref(&*self.value.get()) };
                 Some(f(x))
             }
             None => None,
@@ -231,7 +258,13 @@ impl<T> ConcurrentOption<T> {
     where
         F: FnOnce(&T) -> U,
     {
-        self.map(f).unwrap_or(default)
+        match self.spin_get_handle(SOME, SOME) {
+            Some(_handle) => {
+                let x = unsafe { MaybeUninit::assume_init_ref(&*self.value.get()) };
+                f(x)
+            }
+            None => default,
+        }
     }
 
     /// Computes a default function result (if none), or
@@ -255,7 +288,13 @@ impl<T> ConcurrentOption<T> {
         D: FnOnce() -> U,
         F: FnOnce(&T) -> U,
     {
-        self.map(f).unwrap_or_else(default)
+        match self.spin_get_handle(SOME, SOME) {
+            Some(_handle) => {
+                let x = unsafe { MaybeUninit::assume_init_ref(&*self.value.get()) };
+                f(x)
+            }
+            None => default(),
+        }
     }
 
     /// Thread safe method that returns `true` if the option is a Some and the value inside of it matches a predicate.
@@ -276,7 +315,13 @@ impl<T> ConcurrentOption<T> {
     /// ```
     #[inline]
     pub fn is_some_and(&self, f: impl FnOnce(&T) -> bool) -> bool {
-        self.map(|x| f(x)).unwrap_or(false)
+        match self.spin_get_handle(SOME, SOME) {
+            Some(_handle) => {
+                let x = unsafe { MaybeUninit::assume_init_ref(&*self.value.get()) };
+                f(x)
+            }
+            None => false,
+        }
     }
 
     /// Returns None if the option is None, otherwise returns `other`.
@@ -309,7 +354,10 @@ impl<T> ConcurrentOption<T> {
     /// assert_eq!(x.and(y), None);
     /// ```
     pub fn and<U>(&self, other: impl IntoOption<U>) -> Option<U> {
-        self.map(|_| ()).and(other.into_option())
+        match self.is_some() {
+            true => other.into_option(),
+            false => None,
+        }
     }
 
     /// Returns None if the option is None, otherwise calls `f` with the
@@ -352,8 +400,7 @@ impl<T> ConcurrentOption<T> {
     {
         match self.spin_get_handle(SOME, SOME) {
             Some(_handle) => {
-                let x = unsafe { &*self.value.get() };
-                let x = unsafe { MaybeUninit::assume_init_ref(x) };
+                let x = unsafe { MaybeUninit::assume_init_ref(&*self.value.get()) };
                 f(x).into_option()
             }
             None => None,
@@ -406,8 +453,7 @@ impl<T> ConcurrentOption<T> {
     {
         match self.spin_get_handle(SOME, SOME) {
             Some(_handle) => {
-                let x = unsafe { &*self.value.get() };
-                let x = unsafe { MaybeUninit::assume_init_ref(x) };
+                let x = unsafe { MaybeUninit::assume_init_ref(&*self.value.get()) };
                 match predicate(x) {
                     true => Some(x),
                     false => None,

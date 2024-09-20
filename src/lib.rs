@@ -17,6 +17,7 @@ mod concurrent;
 mod concurrent_option;
 mod drop;
 mod exclusive;
+mod handle;
 mod into;
 mod into_option;
 mod mut_handle;
@@ -27,7 +28,7 @@ mod states;
 mod with_order;
 
 pub use common_traits::iter;
-
 pub use concurrent_option::ConcurrentOption;
 pub use into_option::IntoOption;
-pub use states::State;
+pub use mut_handle::MutHandle;
+pub use states::{State, StateU8, NONE, RESERVED, SOME};

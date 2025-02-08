@@ -1,6 +1,7 @@
 # orx-concurrent-option
 
 [![orx-concurrent-option crate](https://img.shields.io/crates/v/orx-concurrent-option.svg)](https://crates.io/crates/orx-concurrent-option)
+[![orx-concurrent-option crate](https://img.shields.io/crates/d/orx-concurrent-option.svg)](https://crates.io/crates/orx-concurrent-option)
 [![orx-concurrent-option documentation](https://docs.rs/orx-concurrent-option/badge.svg)](https://docs.rs/orx-concurrent-option)
 
 ConcurrentOption is a thread-safe and lock-free read-write option type.
@@ -207,4 +208,4 @@ Contributions are welcome! If you notice an error, have a question or think some
 
 ## License
 
-This library is licensed under MIT license. See LICENSE for details.
+Dual-licensed under [Apache 2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT).

@@ -45,7 +45,7 @@ impl<'a> Handle<'a> {
                     return Some(Self {
                         state,
                         success_state,
-                    })
+                    });
                 }
                 Err(previous_state) => match previous_state {
                     RESERVED => continue,
@@ -56,7 +56,7 @@ impl<'a> Handle<'a> {
     }
 }
 
-impl<'a> Drop for Handle<'a> {
+impl Drop for Handle<'_> {
     fn drop(&mut self) {
         self.state
             .compare_exchange(

@@ -2,6 +2,11 @@ use orx_concurrent_option::*;
 use std::{sync::atomic::Ordering, time::Duration};
 use test_case::test_matrix;
 
+#[cfg(not(miri))]
+const N: usize = 100;
+#[cfg(miri)]
+const N: usize = 15;
+
 #[test_matrix(
     [2, 4, 8, 16],
     [false, true],
@@ -57,7 +62,7 @@ fn concurrent_get_raw_multiple_writer(
 // helpers
 fn read(do_sleep: bool, maybe_ref: &ConcurrentOption<String>, read_order: Ordering) {
     let mut ptr: Option<*const String> = None;
-    for _ in 0..100 {
+    for _ in 0..N {
         sleep(do_sleep);
         match ptr {
             Some(p) => {
@@ -70,14 +75,14 @@ fn read(do_sleep: bool, maybe_ref: &ConcurrentOption<String>, read_order: Orderi
 }
 
 fn write_single(do_sleep: bool, maybe_ref: &ConcurrentOption<String>) {
-    for i in 0..100 {
+    for i in 0..N {
         sleep(do_sleep);
         match i {
-            40 => {
+            x if x == N / 3 => {
                 let inserted = maybe_ref.initialize_if_none(7.to_string());
                 assert!(inserted);
             }
-            70 => {
+            x if x == 2 * N / 3 => {
                 let inserted = maybe_ref.initialize_if_none(111.to_string());
                 assert!(!inserted);
             }
@@ -87,10 +92,10 @@ fn write_single(do_sleep: bool, maybe_ref: &ConcurrentOption<String>) {
 }
 
 fn write_multi(do_sleep: bool, maybe_ref: &ConcurrentOption<String>) {
-    for i in 0..100 {
+    for i in 0..N {
         sleep(do_sleep);
         match i {
-            40 | 70 => {
+            x if x == N / 3 || x == 2 * N / 3 => {
                 let _ = maybe_ref.initialize_if_none(7.to_string());
             }
             _ => {}

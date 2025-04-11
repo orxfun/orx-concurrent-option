@@ -1,6 +1,11 @@
 use orx_concurrent_option::*;
 use std::time::Duration;
 
+#[cfg(not(miri))]
+const N: usize = 100;
+#[cfg(miri)]
+const N: usize = 15;
+
 #[test]
 fn concurrent_read_and_write() {
     enum MutOperation {
@@ -30,7 +35,7 @@ fn concurrent_read_and_write() {
     std::thread::scope(|s| {
         for _ in 0..num_readers {
             s.spawn(|| {
-                for _ in 0..100 {
+                for _ in 0..N {
                     std::thread::sleep(Duration::from_millis(100));
                     let mut num_chars = 0;
                     for maybe in &values {
@@ -44,7 +49,7 @@ fn concurrent_read_and_write() {
 
         for _ in 0..num_writers {
             s.spawn(|| {
-                for i in 0..100 {
+                for i in 0..N {
                     std::thread::sleep(Duration::from_millis(100));
                     let e = i % values.len();
 

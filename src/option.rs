@@ -1,4 +1,4 @@
-use crate::{concurrent_option::ConcurrentOption, states::*, IntoOption};
+use crate::{IntoOption, concurrent_option::ConcurrentOption, states::*};
 use core::sync::atomic::Ordering;
 use core::{mem::MaybeUninit, ops::Deref};
 
@@ -52,10 +52,10 @@ impl<T> ConcurrentOption<T> {
     ///
     /// * It is safe to use this method if the returned reference is discarded (miri would still complain).
     /// * It is also safe to use this method if the caller is able to guarantee that there exist
-    /// no concurrent writes while holding onto this reference.
+    ///   no concurrent writes while holding onto this reference.
     ///   * One such case is using `as_ref` together with `initialize_when_none` method.
-    /// This is perfectly safe since the value will be written only once,
-    /// and `as_ref` returns a valid reference only after the value is initialized.
+    ///     This is perfectly safe since the value will be written only once,
+    ///     and `as_ref` returns a valid reference only after the value is initialized.
     /// * Otherwise, it will lead to an **Undefined Behavior** due to data race.
     ///
     /// # Examples
@@ -72,8 +72,8 @@ impl<T> ConcurrentOption<T> {
     pub unsafe fn as_ref(&self) -> Option<&T> {
         match self.spin_get_handle(SOME, SOME) {
             Some(_handle) => {
-                let x = &*self.value.get();
-                Some(x.assume_init_ref())
+                let x = unsafe { &*self.value.get() };
+                Some(unsafe { x.assume_init_ref() })
             }
             None => None,
         }
@@ -92,10 +92,10 @@ impl<T> ConcurrentOption<T> {
     ///
     /// * It is safe to use this method if the returned reference is discarded (miri would still complain).
     /// * It is also safe to use this method if the caller is able to guarantee that there exist
-    /// no concurrent writes while holding onto this reference.
+    ///   no concurrent writes while holding onto this reference.
     ///   * One such case is using `as_ref` together with `initialize_when_none` method.
-    /// This is perfectly safe since the value will be written only once,
-    /// and `as_ref` returns a valid reference only after the value is initialized.
+    ///     This is perfectly safe since the value will be written only once,
+    ///     and `as_ref` returns a valid reference only after the value is initialized.
     /// * Otherwise, it will lead to an **Undefined Behavior** due to data race.
     ///
     /// # Examples
@@ -115,8 +115,8 @@ impl<T> ConcurrentOption<T> {
     {
         match self.spin_get_handle(SOME, SOME) {
             Some(_handle) => {
-                let x = &*self.value.get();
-                Some(x.assume_init_ref())
+                let x = unsafe { &*self.value.get() };
+                Some(unsafe { x.assume_init_ref() })
             }
             None => None,
         }
@@ -134,10 +134,10 @@ impl<T> ConcurrentOption<T> {
     ///
     /// * It is safe to use this method if the returned reference is discarded (miri would still complain).
     /// * It is also safe to use this method if the caller is able to guarantee that there exist
-    /// no concurrent writes while holding onto this reference.
+    ///   no concurrent writes while holding onto this reference.
     ///   * One such case is using `as_ref` together with `initialize_when_none` method.
-    /// This is perfectly safe since the value will be written only once,
-    /// and `as_ref` returns a valid reference only after the value is initialized.
+    ///     This is perfectly safe since the value will be written only once,
+    ///     and `as_ref` returns a valid reference only after the value is initialized.
     /// * Otherwise, it will lead to an **Undefined Behavior** due to data race.
     ///
     /// # Examples
@@ -158,7 +158,7 @@ impl<T> ConcurrentOption<T> {
     /// ```
     pub unsafe fn iter(&self) -> crate::iter::Iter<'_, T> {
         crate::iter::Iter {
-            maybe: self.as_ref(),
+            maybe: unsafe { self.as_ref() },
         }
     }
 
@@ -204,9 +204,9 @@ impl<T> ConcurrentOption<T> {
     /// Therefore, `map` must be preferred in a concurrent program:
     /// * the map operation via `map` guarantees that the underlying value will not be updated before the operation; while
     /// * the alternative approach with `as_ref` is subject to data race if the state of the optional is concurrently being
-    /// updated by methods such as `take`.
+    ///   updated by methods such as `take`.
     ///   * an exception to this is the `initialize_if_none` method which fits very well the initialize-once scenarios;
-    /// here, `as_ref` and `initialize_if_none` can safely be called concurrently from multiple threads.
+    ///     here, `as_ref` and `initialize_if_none` can safely be called concurrently from multiple threads.
     ///
     /// # Examples
     ///
@@ -426,10 +426,10 @@ impl<T> ConcurrentOption<T> {
     ///
     /// * It is safe to use this method if the returned reference is discarded (miri would still complain).
     /// * It is also safe to use this method if the caller is able to guarantee that there exist
-    /// no concurrent writes while holding onto this reference.
+    ///   no concurrent writes while holding onto this reference.
     ///   * One such case is using `as_ref` together with `initialize_when_none` method.
-    /// This is perfectly safe since the value will be written only once,
-    /// and `as_ref` returns a valid reference only after the value is initialized.
+    ///     This is perfectly safe since the value will be written only once,
+    ///     and `as_ref` returns a valid reference only after the value is initialized.
     /// * Otherwise, it will lead to an **Undefined Behavior** due to data race.
     ///
     /// # Examples

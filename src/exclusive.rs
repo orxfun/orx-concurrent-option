@@ -1,4 +1,4 @@
-use crate::{states::*, ConcurrentOption};
+use crate::{ConcurrentOption, states::*};
 use core::{
     mem::MaybeUninit,
     ops::{Deref, DerefMut},
@@ -108,7 +108,7 @@ impl<T> ConcurrentOption<T> {
     where
         P: FnOnce(&mut T) -> bool,
     {
-        match self.exclusive_as_mut().map_or(false, predicate) {
+        match self.exclusive_as_mut().is_some_and(predicate) {
             true => self.exclusive_take(),
             false => None,
         }

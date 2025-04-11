@@ -1,4 +1,4 @@
-use crate::{states::*, ConcurrentOption};
+use crate::{ConcurrentOption, states::*};
 use core::{mem::MaybeUninit, sync::atomic::Ordering};
 
 impl<T> ConcurrentOption<T> {
@@ -417,7 +417,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// * It is safe to use this method if the returned mutable reference is discarded (miri would still complain).
     /// * It is also safe to use this method if the caller is able to guarantee that there exist
-    /// no concurrent reads or writes while mutating the value.
+    ///   no concurrent reads or writes while mutating the value.
     /// * Otherwise, it will lead to an **Undefined Behavior** due to data race.
     ///
     /// # Examples
@@ -467,7 +467,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// * It is safe to use this method if the returned mutable reference is discarded (miri would still complain).
     /// * It is also safe to use this method if the caller is able to guarantee that there exist
-    /// no concurrent reads or writes while mutating the value.
+    ///   no concurrent reads or writes while mutating the value.
     /// * Otherwise, it will lead to an **Undefined Behavior** due to data race.
     ///
     /// # Examples
@@ -512,7 +512,7 @@ impl<T> ConcurrentOption<T> {
     ///
     /// * It is safe to use this method if the returned mutable reference is discarded (miri would still complain).
     /// * It is also safe to use this method if the caller is able to guarantee that there exist
-    /// no concurrent reads or writes while mutating the value.
+    ///   no concurrent reads or writes while mutating the value.
     /// * Otherwise, it will lead to an **Undefined Behavior** due to data race.
     ///
     /// # Examples

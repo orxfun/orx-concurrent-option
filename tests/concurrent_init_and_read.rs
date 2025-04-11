@@ -1,11 +1,16 @@
 use orx_concurrent_option::*;
 
+#[cfg(not(miri))]
+const N: usize = 100;
+#[cfg(miri)]
+const N: usize = 16;
+
 #[test]
 fn concurrent_init_and_read() {
     fn reader(maybe: &ConcurrentOption<String>) {
         let mut is_none_at_least_once = false;
         let mut is_seven_at_least_once = false;
-        for _ in 0..100 {
+        for _ in 0..N {
             std::thread::sleep(std::time::Duration::from_millis(100));
 
             let read = unsafe { maybe.as_ref() };
@@ -21,14 +26,14 @@ fn concurrent_init_and_read() {
     }
 
     fn initializer(maybe: &ConcurrentOption<String>) {
-        for _ in 0..50 {
+        for _ in 0..(N / 2) {
             // wait for a while to simulate a delay
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
 
         let _ = maybe.initialize_if_none(7.to_string());
 
-        for _ in 0..50 {
+        for _ in 0..(N / 2) {
             // it is safe to call `initialize_if_none` on Some variant
             // it will do nothing
             let inserted = maybe.initialize_if_none(1_000_000.to_string());

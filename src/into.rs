@@ -144,7 +144,7 @@ impl<T> ConcurrentOption<T> {
     /// ```
     pub unsafe fn unwrap_unchecked(self) -> T {
         self.state.store(NONE, Ordering::Relaxed);
-        let x = &mut *self.value.get();
-        x.assume_init_read()
+        let x = unsafe { &mut *self.value.get() };
+        unsafe { x.assume_init_read() }
     }
 }

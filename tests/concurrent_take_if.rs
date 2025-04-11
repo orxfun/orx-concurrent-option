@@ -2,6 +2,11 @@ use orx_concurrent_option::*;
 use std::time::Duration;
 use test_case::test_matrix;
 
+#[cfg(not(miri))]
+const N: usize = 100;
+#[cfg(miri)]
+const N: usize = 15;
+
 #[test_matrix(
     [2, 4, 8, 16],
     [false, true]
@@ -49,7 +54,7 @@ fn concurrent_take_if_multiple_writer(num_writers: usize, num_readers: usize, do
 
 // helpers
 fn reader(do_sleep: bool, maybe: &ConcurrentOption<String>) {
-    for _ in 0..100 {
+    for _ in 0..N {
         sleep(do_sleep);
         let is_none_or_seven = maybe.map(|x| x == &7.to_string()).unwrap_or(true);
         assert!(is_none_or_seven);
@@ -57,10 +62,10 @@ fn reader(do_sleep: bool, maybe: &ConcurrentOption<String>) {
 }
 
 fn taker(do_sleep: bool, maybe: &ConcurrentOption<String>) {
-    for i in 0..100 {
+    for i in 0..N {
         sleep(do_sleep);
         match i {
-            50 => {
+            x if x == N / 2 => {
                 let _ = maybe.take_if(|x| x == &7.to_string());
             }
             _ => {

@@ -1,4 +1,4 @@
-use crate::{states::*, ConcurrentOption};
+use crate::{ConcurrentOption, states::*};
 use core::{
     cell::UnsafeCell,
     mem::MaybeUninit,
@@ -48,13 +48,14 @@ impl<'a, T> MutHandle<'a, T> {
     /// This operation might lead to undefined behavior:
     /// * if we use it while other threads are accessing the data, or
     /// * if the optional `is_none` when we access the value.
+    #[allow(clippy::mut_from_ref)]
     pub unsafe fn get_mut(&self) -> &mut T {
         let x = unsafe { &mut *self.value.get() };
         unsafe { MaybeUninit::assume_init_mut(x) }
     }
 }
 
-impl<'a, T> Drop for MutHandle<'a, T> {
+impl<T> Drop for MutHandle<'_, T> {
     fn drop(&mut self) {
         self.state
             .compare_exchange(

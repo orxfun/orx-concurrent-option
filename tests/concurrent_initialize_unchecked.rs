@@ -2,6 +2,11 @@ use orx_concurrent_option::*;
 use std::{sync::atomic::Ordering, time::Duration};
 use test_case::test_matrix;
 
+#[cfg(not(miri))]
+const N: usize = 100;
+#[cfg(miri)]
+const N: usize = 15;
+
 #[test_matrix(
     [2, 4, 8, 16],
     [false, true],
@@ -26,7 +31,7 @@ fn concurrent_initialize_unchecked(num_readers: usize, do_sleep: bool, read_orde
 
 // helpers
 fn read(do_sleep: bool, maybe_ref: &ConcurrentOption<String>, read_order: Ordering) {
-    for _ in 0..100 {
+    for _ in 0..N {
         sleep(do_sleep);
         let read = unsafe { maybe_ref.as_ref_with_order(read_order) };
         let is_none = read.is_none();
@@ -36,10 +41,10 @@ fn read(do_sleep: bool, maybe_ref: &ConcurrentOption<String>, read_order: Orderi
 }
 
 fn write_single(do_sleep: bool, maybe_ref: &ConcurrentOption<String>) {
-    for i in 0..100 {
+    for i in 0..N {
         sleep(do_sleep);
         match i {
-            40 => unsafe { maybe_ref.initialize_unchecked(7.to_string()) },
+            x if x == N / 3 => unsafe { maybe_ref.initialize_unchecked(7.to_string()) },
             _ => {}
         }
     }

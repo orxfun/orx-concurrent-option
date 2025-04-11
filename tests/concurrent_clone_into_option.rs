@@ -2,6 +2,11 @@ use orx_concurrent_option::*;
 use std::time::Duration;
 use test_case::test_matrix;
 
+#[cfg(not(miri))]
+const N: usize = 100;
+#[cfg(miri)]
+const N: usize = 15;
+
 #[test_matrix(
     [2, 4, 8, 16],
     [false, true]
@@ -53,7 +58,7 @@ fn concurrent_clone_into_option_multiple_writer(
 
 // helpers
 fn reader(do_sleep: bool, maybe: &ConcurrentOption<String>) {
-    for _ in 0..100 {
+    for _ in 0..N {
         sleep(do_sleep);
         let is_none_or_seven = maybe.map(|x| x == &7.to_string()).unwrap_or(true);
         assert!(is_none_or_seven);
@@ -61,7 +66,7 @@ fn reader(do_sleep: bool, maybe: &ConcurrentOption<String>) {
 }
 
 fn cloner(do_sleep: bool, maybe: &ConcurrentOption<String>) {
-    for _ in 0..100 {
+    for _ in 0..N {
         sleep(do_sleep);
         let _ = maybe.clone_into_option();
     }

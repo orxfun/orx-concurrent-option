@@ -233,7 +233,7 @@ impl<T> ConcurrentOption<T> {
         &self,
         initial_state: StateU8,
         success_state: StateU8,
-    ) -> Option<MutHandle<T>> {
+    ) -> Option<MutHandle<'_, T>> {
         MutHandle::spin_get(self, initial_state, success_state)
     }
 }

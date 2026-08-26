@@ -23,12 +23,7 @@ impl<T: PartialEq> PartialEq for ConcurrentOption<T> {
     /// assert!(z.eq(&z));
     /// ```
     fn eq(&self, other: &Self) -> bool {
-        match unsafe { (self.as_ref(), other.as_ref()) } {
-            (Some(l), Some(r)) => l.eq(r),
-            (Some(_), None) => false,
-            (None, Some(_)) => false,
-            (None, None) => true,
-        }
+        self.locked_compare(other, true, false, false, |l, r| l.eq(r))
     }
 }
 

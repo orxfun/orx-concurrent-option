@@ -29,12 +29,9 @@ impl<T: PartialOrd> PartialOrd for ConcurrentOption<T> {
     /// assert_eq!(z.partial_cmp(&z), Some(Equal));
     /// ```
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        match unsafe { (self.as_ref(), other.as_ref()) } {
-            (Some(l), Some(r)) => l.partial_cmp(r),
-            (Some(_), None) => Some(Greater),
-            (None, Some(_)) => Some(Less),
-            (None, None) => Some(Equal),
-        }
+        self.locked_compare(other, Some(Equal), Some(Greater), Some(Less), |l, r| {
+            l.partial_cmp(r)
+        })
     }
 }
 
@@ -66,11 +63,6 @@ impl<T: Ord> Ord for ConcurrentOption<T> {
     /// assert_eq!(z.cmp(&z), Equal);
     /// ```
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        match unsafe { (self.as_ref(), other.as_ref()) } {
-            (Some(l), Some(r)) => l.cmp(r),
-            (Some(_), None) => Greater,
-            (None, Some(_)) => Less,
-            (None, None) => Equal,
-        }
+        self.locked_compare(other, Equal, Greater, Less, |l, r| l.cmp(r))
     }
 }

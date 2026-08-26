@@ -241,13 +241,8 @@ impl<T> ConcurrentOption<T> {
     where
         T: PartialEq,
     {
-        match (unsafe { self.as_ref_with_order(order) }, unsafe {
-            other.as_ref_with_order(order)
-        }) {
-            (None, None) => true,
-            (Some(x), Some(y)) => x.eq(y),
-            _ => false,
-        }
+        let _ = order;
+        self.locked_compare(other, true, false, false, |l, r| l.eq(r))
     }
 
     /// Returns an ordering between `self` and `other` with the desired `order`.
@@ -288,14 +283,10 @@ impl<T> ConcurrentOption<T> {
     {
         use core::cmp::Ordering::*;
 
-        match (unsafe { self.as_ref_with_order(order) }, unsafe {
-            other.as_ref_with_order(order)
-        }) {
-            (Some(l), Some(r)) => l.partial_cmp(r),
-            (Some(_), None) => Some(Greater),
-            (None, Some(_)) => Some(Less),
-            (None, None) => Some(Equal),
-        }
+        let _ = order;
+        self.locked_compare(other, Some(Equal), Some(Greater), Some(Less), |l, r| {
+            l.partial_cmp(r)
+        })
     }
 
     /// Returns an ordering between `self` and `other` with the desired `order`.
@@ -332,13 +323,7 @@ impl<T> ConcurrentOption<T> {
     {
         use core::cmp::Ordering::*;
 
-        match (unsafe { self.as_ref_with_order(order) }, unsafe {
-            other.as_ref_with_order(order)
-        }) {
-            (Some(l), Some(r)) => l.cmp(r),
-            (Some(_), None) => Greater,
-            (None, Some(_)) => Less,
-            (None, None) => Equal,
-        }
+        let _ = order;
+        self.locked_compare(other, Equal, Greater, Less, |l, r| l.cmp(r))
     }
 }

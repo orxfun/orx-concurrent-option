@@ -1,6 +1,6 @@
 [package]
 name = "orx-concurrent-option"
-version = "1.5.0"
+version = "1.6.0"
 edition = "2024"
 authors = ["orxfun <orx.ugur.arikan@gmail.com>"]
 description = "ConcurrentOption is a lock-free concurrent read and write option type."

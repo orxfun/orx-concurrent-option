@@ -233,8 +233,58 @@ impl<T> ConcurrentOption<T> {
         &self,
         initial_state: StateU8,
         success_state: StateU8,
-    ) -> Option<MutHandle<T>> {
+    ) -> Option<MutHandle<'_, T>> {
         MutHandle::spin_get(self, initial_state, success_state)
+    }
+
+    /// Compares `self` and `other` while holding both in the reserved state for the entire
+    /// duration of the comparison, so that a concurrent mutation of either option cannot race
+    /// with the read of its value.
+    ///
+    /// `some_some` is only called with valid references to the underlying values of both options,
+    /// and only while both options are locked; it must not be able to observe or cause any further
+    /// mutation of either option.
+    pub(crate) fn locked_compare<R>(
+        &self,
+        other: &Self,
+        none_none: R,
+        some_none: R,
+        none_some: R,
+        some_some: impl FnOnce(&T, &T) -> R,
+    ) -> R {
+        if core::ptr::eq(self, other) {
+            // avoid locking the same option twice, which would deadlock
+            return match self.spin_get_handle(crate::states::SOME, crate::states::SOME) {
+                Some(handle) => {
+                    let l = unsafe { (*self.value.get()).assume_init_ref() };
+                    let result = some_some(l, l);
+                    drop(handle);
+                    result
+                }
+                None => none_none,
+            };
+        }
+
+        match self.spin_get_handle(crate::states::SOME, crate::states::SOME) {
+            None => match other.is_some() {
+                true => none_some,
+                false => none_none,
+            },
+            Some(handle_self) => {
+                let result = match other.spin_get_handle(crate::states::SOME, crate::states::SOME) {
+                    Some(handle_other) => {
+                        let l = unsafe { (*self.value.get()).assume_init_ref() };
+                        let r = unsafe { (*other.value.get()).assume_init_ref() };
+                        let out = some_some(l, r);
+                        drop(handle_other);
+                        out
+                    }
+                    None => some_none,
+                };
+                drop(handle_self);
+                result
+            }
+        }
     }
 }
 

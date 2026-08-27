@@ -159,6 +159,7 @@ impl<T> ConcurrentOption<T> {
     pub unsafe fn iter(&self) -> crate::iter::Iter<'_, T> {
         crate::iter::Iter {
             maybe: unsafe { self.as_ref() },
+            _handle: None,
         }
     }
 

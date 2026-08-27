@@ -189,7 +189,10 @@ impl<T> ConcurrentOption<T> {
     /// ```
     pub unsafe fn iter_with_order(&self, order: Ordering) -> crate::iter::Iter<'_, T> {
         let maybe = unsafe { self.as_ref_with_order(order) };
-        crate::iter::Iter { maybe }
+        crate::iter::Iter {
+            maybe,
+            _handle: None,
+        }
     }
 
     /// Clones the concurrent option with the desired `order` into an Option.
@@ -210,7 +213,15 @@ impl<T> ConcurrentOption<T> {
     where
         T: Clone,
     {
-        unsafe { self.as_ref_with_order(order) }.cloned()
+        // hold the lock for the entire clone; `as_ref_with_order` provides no synchronization at all
+        let _ = order;
+        match self.spin_get_handle(SOME, SOME) {
+            Some(_handle) => {
+                let x = unsafe { (*self.value.get()).assume_init_ref() };
+                Some(x.clone())
+            }
+            None => None,
+        }
     }
 
     /// Returns whether or not self is equal to the `other` with the desired `order`.

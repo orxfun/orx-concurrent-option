@@ -1,4 +1,4 @@
-use crate::ConcurrentOption;
+use crate::{ConcurrentOption, states::SOME};
 
 impl<T: Clone> Clone for ConcurrentOption<T> {
     /// Clones the concurrent option with the [`Relaxed`] ordering.
@@ -22,8 +22,12 @@ impl<T: Clone> Clone for ConcurrentOption<T> {
     /// assert_eq!(x, y);
     /// ```
     fn clone(&self) -> Self {
-        match unsafe { self.as_ref() } {
-            Some(x) => Self::some(x.clone()),
+        // hold the lock for the entire clone; `as_ref` alone would release it before `x.clone()` runs
+        match self.spin_get_handle(SOME, SOME) {
+            Some(_handle) => {
+                let x = unsafe { (*self.value.get()).assume_init_ref() };
+                Self::some(x.clone())
+            }
             None => Self::none(),
         }
     }

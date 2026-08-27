@@ -1,4 +1,4 @@
-use crate::concurrent_option::ConcurrentOption;
+use crate::{concurrent_option::ConcurrentOption, states::SOME};
 use core::fmt::Debug;
 
 impl<T: Debug> Debug for ConcurrentOption<T> {
@@ -17,7 +17,13 @@ impl<T: Debug> Debug for ConcurrentOption<T> {
     /// assert_eq!(y, "ConcurrentNone");
     /// ```
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let maybe = unsafe { self.as_ref() };
-        write!(f, "Concurrent{:?}", maybe)
+        // hold the lock while formatting; `as_ref` alone would release it before the value is read
+        match self.spin_get_handle(SOME, SOME) {
+            Some(_handle) => {
+                let x = unsafe { (*self.value.get()).assume_init_ref() };
+                write!(f, "Concurrent{:?}", Some(x))
+            }
+            None => write!(f, "ConcurrentNone"),
+        }
     }
 }
